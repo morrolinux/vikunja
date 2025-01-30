@@ -44,6 +44,16 @@
 </template>
 
 <script setup lang="ts">
+import {isProxy, toRaw } from 'vue';
+import {
+	type CollapsedBuckets,
+	getCollapsedBucketState,
+	saveCollapsedBucketState,
+} from '@/helpers/saveCollapsedBucketState'
+import {useTaskStore} from '@/stores/tasks'
+import {useKanbanStore} from '@/stores/kanban'
+import type {TaskFilterParams} from '@/services/taskCollection'
+
 import {computed, ref, watch, toRefs} from 'vue'
 import {useRouter} from 'vue-router'
 
@@ -139,6 +149,45 @@ watch(
 	{deep: true, immediate: true},
 )
 
+const params = ref<TaskFilterParams>({
+	sort_by: [],
+	order_by: [],
+	filter: '',
+	filter_include_nulls: false,
+	s: '',
+})
+
+function findBucketForTask(t: ITask){
+	const kanbanStore = useKanbanStore()
+	let buckets = computed(() => kanbanStore.buckets)
+
+	try {
+		console.log("looking for " + t.title + " (" + t.id + ")...")
+
+		for (let i=0; i<Object.keys(buckets).length; i++) {
+			let bucketObj
+			if (isProxy(buckets.value[i])){
+				bucketObj = toRaw(buckets.value[i])
+			} else {
+				bucketObj = buckets.value[i]
+			}
+
+			const bucketTitle = bucketObj.title
+			for (const task of bucketObj.tasks) {
+				console.log(task.title)
+				if (task.id === t.id) {
+					return "<span style='border-radius: 4px; padding-inline: 2px; background-color: black; color: white'><b>" + bucketTitle + "</b></span>";
+				}
+			}
+		}
+		return ""
+	} catch (error) {
+		console.error("findBucketForTask:", error)
+		return ""
+	}
+}
+
+
 function transformTaskToGanttBar(t: ITask) {
 	const black = 'var(--grey-800)'
 	
@@ -163,8 +212,9 @@ function transformTaskToGanttBar(t: ITask) {
 	for (const label of t.labels) {
 		task_labels_html += "<span style='border-radius: 5px; padding-inline: 2px; background-color:" + label.hexColor + "; color:" + label.textColor + "'>#" + label.title + "</span>";
 	}
+	task_labels_html += findBucketForTask(t)
 
-	let customBar = "<div style='text-align:center; position: absolute;display: inline-block;top: 0;left: 0;height: 100%;width: 100%; align-content: center; padding-bottom: 4px; background: transparent;'>" + "<b>" + t.title + " <small><small>" + findBucketForTask(t) + "</small></small></b><p>" + task_labels_html + "</p>" + "<div style='border-radius: 6px 0px 0px 6px;content:\"\";z-index: -1; position: absolute;top: 0;left: 0;height: 100%;width: " + t.percentDone*100 + "%; background: orange;'></div></div>"
+	let customBar = "<div style='text-align:center; position: absolute;display: inline-block;top: 0;left: 0;height: 100%;width: 100%; align-content: center; padding-bottom: 4px; background: transparent;'>" + "<b>" + t.title + "</b><p>" + task_labels_html + "</p>" + "<div style='border-radius: 6px 0px 0px 6px;content:\"\";z-index: -1; position: absolute;top: 0;left: 0;height: 100%;width: " + t.percentDone*100 + "%; background: orange;'></div></div>"
 
 	return [{
 		startDate: isoToKebabDate(t.startDate ? t.startDate.toISOString() : props.defaultTaskStartDate),
