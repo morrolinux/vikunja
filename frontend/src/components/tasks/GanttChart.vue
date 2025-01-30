@@ -13,6 +13,7 @@
 			:chart-start="isoToKebabDate(filters.dateFrom)"
 			:chart-end="isoToKebabDate(filters.dateTo)"
 			precision="day"
+			row-height="64"
 			bar-start="startDate"
 			bar-end="endDate"
 			:grid="true"
@@ -156,14 +157,23 @@ function transformTaskToGanttBar(t: ITask) {
 			textColor = 'white'
 		}
 	}
-	
+
+	// get task labels
+	let task_labels_html = "";
+	for (const label of t.labels) {
+		task_labels_html += "<span style='border-radius: 5px; padding-inline: 2px; background-color:" + label.hexColor + "; color:" + label.textColor + "'>#" + label.title + "</span>";
+	}
+
+	let customBar = "<div style='text-align:center; position: absolute;display: inline-block;top: 0;left: 0;height: 100%;width: 100%; align-content: center; padding-bottom: 4px; background: transparent;'>" + "<b>" + t.title + " <small><small>" + findBucketForTask(t) + "</small></small></b><p>" + task_labels_html + "</p>" + "<div style='border-radius: 6px 0px 0px 6px;content:\"\";z-index: -1; position: absolute;top: 0;left: 0;height: 100%;width: " + t.percentDone*100 + "%; background: orange;'></div></div>"
+
 	return [{
 		startDate: isoToKebabDate(t.startDate ? t.startDate.toISOString() : props.defaultTaskStartDate),
 		endDate: isoToKebabDate(t.endDate ? t.endDate.toISOString() : props.defaultTaskEndDate),
 		ganttBarConfig: {
 			id: String(t.id),
-			label: t.title,
+			// label: t.title,
 			hasHandles: true,
+			html: customBar,
 			style: {
 				color: textColor,
 				backgroundColor,
@@ -283,7 +293,12 @@ const dateIsToday = computed(() => (date: Date) => {
 		height: 75% !important;
 		opacity: .75 !important;
 		border-radius: $radius !important;
-		margin-top: 4px;
+		margin-top: 6px;
 	}
 }
+
+.g-gantt-bar-label {
+	flex-direction: column;
+}
+
 </style>
