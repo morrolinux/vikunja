@@ -498,6 +498,7 @@ watch(
 		}
 		collapsedBuckets.value = getCollapsedBucketState(projectId)
 		kanbanStore.loadBucketsForProject(projectId, viewId, params)
+		console.debug("params:", params)
 	},
 	{
 		immediate: true,
@@ -625,6 +626,13 @@ async function updateTaskPosition(e) {
 			}))
 			Object.assign(newTask, updatedTaskBucket.task)
 			newTask.bucketId = updatedTaskBucket.bucketId
+			newTask.done = updatedTaskBucket.taskDone
+
+			// update task percentDone according to the current bucket position
+			newTask.percentDone = bucketIndex / (buckets.value.length-1)	
+			// store the change we just made.
+			await taskStore.update(newTask)
+			
 			if (updatedTaskBucket.bucketId !== newTask.bucketId) {
 				kanbanStore.moveTaskToBucket(newTask, updatedTaskBucket.bucketId)
 			}
