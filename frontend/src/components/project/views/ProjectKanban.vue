@@ -305,7 +305,7 @@
 import {useKanban} from '@/composables/useKanban'
 import {bucketHasMore, kanbanKeys, type BucketResponse} from '@/client/queries/kanban'
 import {removeTaskFromBoard} from '@/client/queries/taskCache'
-import {useUpdateTaskPositionMutation, useMoveTaskMutation} from '@/client/queries/taskMutations'
+import {useUpdateTaskPositionMutation, useMoveTaskMutation, useUpdateTaskMutation} from '@/client/queries/taskMutations'
 import {
 	useCreateBucketMutation,
 	useDeleteBucketMutation,
@@ -384,6 +384,7 @@ const authStore = useAuthStore()
 const alwaysShowBucketTaskCount = computed(() => authStore.settings.frontend_settings.always_show_bucket_task_count)
 const {handleTaskDropToProject} = useTaskDragToProject()
 const positionMutation = useUpdateTaskPositionMutation()
+const updateTaskMutation = useUpdateTaskMutation()
 const moveMutation = useMoveTaskMutation()
 
 const savedFilter = useQuery(computed(() => savedFilterQuery(getSavedFilterIdFromProjectId(projectId.value)))).data
@@ -598,6 +599,15 @@ async function updateTaskPosition(e: SortableEvent & {originalEvent?: MouseEvent
 		if (bucket.id !== sourceBucket.value) {
 			const result = await moveMutation.mutateAsync({project, view, bucket: bucket.id, task})
 			if (result.bucket_id !== undefined && result.bucket_id !== bucket.id) return
+
+			// Set the task's progress proportionally to the position of the bucket it was moved into.
+			const bucketIndex = Number(e.to.dataset.bucketIndex)
+			if (buckets.value.length > 1) {
+				await updateTaskMutation.mutateAsync({
+					id: task.id,
+					percent_done: bucketIndex / (buckets.value.length - 1),
+				})
+			}
 		}
 		await positionMutation.mutateAsync({
 			taskId: task.id,
