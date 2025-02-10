@@ -44,6 +44,12 @@
 					>
 						{{ $t('task.show.noDates') }}
 					</FancyCheckbox>
+					<FancyCheckbox
+						v-model="filters.compactView"
+						is-block
+					>
+						{{ $t('task.show.compactView') }}
+					</FancyCheckbox>
 				</div>
 			</Card>
 
