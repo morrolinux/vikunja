@@ -21,9 +21,11 @@ export interface GanttFilters {
 	dateFrom: DateISO
 	dateTo: DateISO
 	showTasksWithoutDates: boolean
+	compactView: boolean
 }
 
 const DEFAULT_SHOW_TASKS_WITHOUT_DATES = false
+const DEFAULT_SHOW_COMPACT_VIEW = true
 
 const DEFAULT_DATEFROM_DAY_OFFSET = -15
 const DEFAULT_DATETO_DAY_OFFSET = +55
@@ -47,6 +49,8 @@ function ganttRouteToFilters(route: Partial<RouteLocationNormalized>): GanttFilt
 		dateFrom: parseDateProp(ganttRoute.query?.dateFrom as DateKebab) || getDefaultDateFrom(),
 		dateTo: parseDateProp(ganttRoute.query?.dateTo as DateKebab) || getDefaultDateTo(),
 		showTasksWithoutDates: parseBooleanProp(ganttRoute.query?.showTasksWithoutDates as string) || DEFAULT_SHOW_TASKS_WITHOUT_DATES,
+		compactView: parseBooleanProp(ganttRoute.query?.compactView as string) || DEFAULT_SHOW_COMPACT_VIEW,
+
 	}
 }
 
@@ -72,6 +76,10 @@ function ganttFiltersToRoute(filters: GanttFilters): RouteLocationRaw {
 
 	if (filters.showTasksWithoutDates) {
 		query.showTasksWithoutDates = String(filters.showTasksWithoutDates)
+	}
+
+	if (filters.compactView) {
+		query.compactView = String(filters.compactView)
 	}
 
 	return {

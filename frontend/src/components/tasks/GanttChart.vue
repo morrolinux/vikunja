@@ -145,6 +145,9 @@ watch(
 	() => {
 		ganttBars.value = []
 		tasks.value.forEach(t => ganttBars.value.push(transformTaskToGanttBar(t)))
+		if (filters.value.compactView) {
+			ganttBars.value = assignRowsToGanttBars()
+		}
 	},
 	{deep: true, immediate: true},
 )
@@ -268,6 +271,46 @@ const dateIsToday = computed(() => (date: Date) => {
 		date.getFullYear() === today.value.getFullYear()
 	)
 })
+
+function doBarsOverlap(bar1: GanttBarObject, rowBars: GanttBarObject[]): boolean {
+	for (let j = 0; j < rowBars.length; j++) {
+		if ((bar1.startDate >= rowBars[j].startDate && bar1.startDate < rowBars[j].endDate) || 
+		(rowBars[j].startDate >= bar1.startDate && rowBars[j].startDate < bar1.endDate)) {
+			return true
+		}
+	}
+	return false
+}
+
+function assignRowsToGanttBars() {
+	const assignedBars = [];
+	let currentRow = [];
+
+	let gttbars = ganttBars.value
+
+	for (let i = 0; i < gttbars.length; i++) {
+		const bar = gttbars[i][0]; // Since each array contains a single object
+		let placed = false;
+
+		// push to existing rows if not colliding
+		for (let j = 0; j < assignedBars.length; j++) {
+			if (!doBarsOverlap(bar, assignedBars[j])) {
+				assignedBars[j].push(bar);
+				placed = true;
+				break;
+			}
+		}
+
+		// If the bar was not placed, add a new row
+		if (!placed) {
+			currentRow = [bar];
+			assignedBars.push(currentRow);
+		}
+	}
+
+	return assignedBars;
+}
+
 </script>
 
 <style scoped lang="scss">
