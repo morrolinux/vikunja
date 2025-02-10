@@ -758,7 +758,8 @@
       "overdue": "Mostra attività scadute",
       "fromuntil": "Attività dal {from} al {until}",
       "select": "Seleziona intervallo di date",
-      "noTasks": "Nessuna attività — Buona giornata!"
+      "noTasks": "Nessuna attività — Buona giornata!",
+      "compactView": "Mostra la vista compatta."
     },
     "detail": {
       "chooseDueDate": "Clicca qui per impostare una data di scadenza",
