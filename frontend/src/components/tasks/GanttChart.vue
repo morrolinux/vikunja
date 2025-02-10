@@ -25,7 +25,10 @@
 			<template #timeunit="{date}">
 				<div
 					class="timeunit-wrapper"
-					:class="{'today': dateIsToday(date)}"
+					:class="{
+						'today': dateIsToday(date), 
+						'publishDay': dateIsRed(date) && !dateIsToday(date),
+					}"
 				>
 					<span>{{ date.getDate() }}</span>
 					<span class="weekday">
@@ -264,6 +267,13 @@ function openTask(e: {
 const weekDayFromDate = useWeekDayFromDate()
 
 const {now: today} = useGlobalNow()
+
+const dateIsRed = computed(() => (date: Date) => {
+	return (
+		date.getDay() == 1
+	)
+})
+
 const dateIsToday = computed(() => (date: Date) => {
 	return (
 		date.getDate() === today.value.getDate() &&
@@ -351,6 +361,13 @@ function assignRowsToGanttBars() {
 
 	&.today {
 		background: var(--primary);
+		color: var(--white);
+		border-radius: 5px 5px 0 0;
+		font-weight: bold;
+	}
+
+	&.publishDay {
+		background: #df4a33;
 		color: var(--white);
 		border-radius: 5px 5px 0 0;
 		font-weight: bold;
