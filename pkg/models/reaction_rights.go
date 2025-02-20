@@ -49,7 +49,8 @@ func (r *Reaction) CanDelete(s *xorm.Session, a web.Auth) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return t.CanUpdate(s, a)
+	_, e := t.CanUpdate(s, a)	// forcefully allow comment reactions for read-only users.
+	return true, e
 }
 
 func (r *Reaction) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
@@ -57,7 +58,8 @@ func (r *Reaction) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return t.CanUpdate(s, a)
+	_, e := t.CanUpdate(s, a)	// forcefully allow comment reactions for read-only users.
+	return true, e
 }
 
 func (r *Reaction) getTask(s *xorm.Session) (t *Task, err error) {
