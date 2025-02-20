@@ -5,7 +5,7 @@
 		class="content details comments-container"
 	>
 		<h3
-			v-if="canWrite || comments.length > 0"
+			v-if="comments.length > 0"
 			class="comments-heading"
 			:class="{'d-print-none': comments.length === 0}"
 		>
@@ -106,7 +106,7 @@
 					</div>
 					<Editor
 						v-model="c.comment"
-						:is-edit-enabled="canWrite && c.author.id === currentUserId"
+						:is-edit-enabled="c.author.id === currentUserId"
 						:upload-callback="attachmentUpload"
 						:upload-enabled="true"
 						:bottom-actions="actions[c.id]"
@@ -131,7 +131,7 @@
 						class="mbs-2" 
 						entity-kind="comments"
 						:entity-id="c.id"
-						:disabled="!canWrite"
+						:disabled="false"
 					/>
 				</div>
 			</div>
@@ -144,7 +144,7 @@
 			/>
 
 			<div
-				v-if="canWrite"
+				v-if="true"
 				class="media comment d-print-none"
 			>
 				<figure class="media-left is-hidden-mobile">
@@ -301,9 +301,6 @@ watch(() => authStore.info, async (nu) => {
 const currentUserId = computed(() => authStore.info.id)
 const enabled = computed(() => configStore.taskCommentsEnabled)
 const actions = computed(() => {
-	if (!props.canWrite) {
-		return {}
-	}
 	return Object.fromEntries(comments.value.map((comment) => ([
 		comment.id,
 		comment.author.id === currentUserId.value
