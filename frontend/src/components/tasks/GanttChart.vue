@@ -220,7 +220,7 @@ function transformTaskToGanttBar(t: ITask) {
 	}
 	task_labels_html += findBucketForTask(t)
 
-	let customBar = "<div style='text-align:center; position: absolute;display: inline-block;top: 0;left: 0;height: 100%;width: 100%; align-content: center; padding-bottom: 4px; background: transparent;'>" + "<b>" + t.title + "</b><p>" + task_labels_html + "</p>" + "<div style='border-radius: 6px 0px 0px 6px;content:\"\";z-index: -1; position: absolute;top: 0;left: 0;height: 100%;width: " + t.percentDone*100 + "%; background: orange;'></div></div>"
+	let customBar = "<div style='text-align:right; padding-right: 16px; position: absolute;display: inline-block;top: 0;left: 0;height: 100%;width: 100%; align-content: center; padding-bottom: 4px; background: transparent;'>" + "<b>" + t.title + "</b><p>" + task_labels_html + "</p>" + "<div style='border-radius: 6px 0px 0px 6px;content:\"\";z-index: -1; position: absolute;top: 0;left: 0;height: 100%;width: " + t.percentDone*100 + "%; background: orange;'></div></div>"
 
 	return [{
 		startDate: isoToKebabDate(t.startDate ? t.startDate.toISOString() : props.defaultTaskStartDate),
