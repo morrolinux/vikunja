@@ -28,12 +28,14 @@ func (tc *TaskComment) CanRead(s *xorm.Session, a web.Auth) (bool, int, error) {
 }
 
 func (tc *TaskComment) canUserModifyTaskComment(s *xorm.Session, a web.Auth) (bool, error) {
+	// Fork: read access to the task is enough to modify one's own comments,
+	// so read-only users can take part in discussions.
 	t := Task{ID: tc.TaskID}
-	canWriteTask, err := t.CanWrite(s, a)
+	canReadTask, _, err := t.CanRead(s, a)
 	if err != nil {
 		return false, err
 	}
-	if !canWriteTask {
+	if !canReadTask {
 		return false, nil
 	}
 
@@ -59,8 +61,10 @@ func (tc *TaskComment) CanUpdate(s *xorm.Session, a web.Auth) (bool, error) {
 	return tc.canUserModifyTaskComment(s, a)
 }
 
-// CanCreate checks if a user can create a new comment
+// CanCreate checks if a user can create a new comment.
+// Fork: read access to the task is enough to leave a comment.
 func (tc *TaskComment) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
 	t := Task{ID: tc.TaskID}
-	return t.CanWrite(s, a)
+	can, _, err := t.CanRead(s, a)
+	return can, err
 }

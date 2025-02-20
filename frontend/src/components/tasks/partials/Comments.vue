@@ -5,7 +5,7 @@
 		class="content details comments-container"
 	>
 		<h2
-			v-if="canWrite || comments.length > 0"
+			v-if="comments.length > 0"
 			class="comments-heading task-section-title"
 			:class="{'d-print-none': comments.length === 0}"
 		>
@@ -102,7 +102,7 @@
 					</div>
 					<Editor
 						:model-value="commentDrafts[c.id] ?? c.comment"
-						:is-edit-enabled="canWrite && c.author?.id === currentUserId"
+						:is-edit-enabled="c.author?.id === currentUserId"
 						:upload-callback="attachmentUpload"
 						:upload-enabled="true"
 						:bottom-actions="actions[c.id]"
@@ -123,7 +123,7 @@
 						entity-kind="comments"
 						:entity-id="c.id"
 						:task-id="taskId"
-						:disabled="!canWrite"
+						:disabled="false"
 					/>
 				</div>
 			</div>
@@ -136,7 +136,6 @@
 			/>
 
 			<div
-				v-if="canWrite"
 				class="media comment d-print-none"
 				:class="{'new-comment-top': commentSortOrder === 'desc'}"
 			>
@@ -295,9 +294,6 @@ const saving = ref<ITask['id'] | null>(null)
 const currentUserId = computed(() => authStore.info?.id ?? null)
 const enabled = computed(() => configStore.task_comments_enabled)
 const actions = computed(() => {
-	if (!props.canWrite) {
-		return {}
-	}
 	return Object.fromEntries(comments.value.map((comment) => {
 		const list: {action: () => void, title: string}[] = [{
 			action: () => startReplyTo(comment),

@@ -44,20 +44,26 @@ func (r *Reaction) CanRead(s *xorm.Session, a web.Auth) (bool, int, error) {
 	return t.CanRead(s, a)
 }
 
+// CanDelete - Fork: read access to the task is enough to react.
+// Deleting only ever removes the user's own reaction.
 func (r *Reaction) CanDelete(s *xorm.Session, a web.Auth) (bool, error) {
 	t, err := r.getTask(s)
 	if err != nil {
 		return false, err
 	}
-	return t.CanUpdate(s, a)
+	can, _, err := t.CanRead(s, a)
+	return can, err
 }
 
+// CanCreate - Fork: read access to the task is enough to react.
+// Deleting only ever removes the user's own reaction.
 func (r *Reaction) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
 	t, err := r.getTask(s)
 	if err != nil {
 		return false, err
 	}
-	return t.CanUpdate(s, a)
+	can, _, err := t.CanRead(s, a)
+	return can, err
 }
 
 func (r *Reaction) getTask(s *xorm.Session) (t *Task, err error) {
