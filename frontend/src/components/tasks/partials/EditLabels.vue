@@ -41,7 +41,7 @@
 				:style="{'background': option.hexColor, 'color': option.textColor}"
 				class="tag search-result"
 			>
-				<span>{{ option.title }}</span>
+				<span>{{ option.title }} {{ option.description ? `(${option.description})` : '' }}</span>
 			</span>
 		</template>
 	</Multiselect>
@@ -132,13 +132,15 @@ async function removeLabel(label: ILabel) {
 	success({message: t('task.label.removeSuccess')})
 }
 
-async function createAndAddLabel(title: string) {
+async function createAndAddLabel(l: string) {
 	if (props.taskId === 0) {
 		return
 	}
+	const [title, description] = l.split(':');
 
 	const newLabel = await labelStore.createLabel(new LabelModel({
 		title,
+		description,
 		hexColor: getRandomColorHex(),
 	}))
 	addLabel(newLabel, false)

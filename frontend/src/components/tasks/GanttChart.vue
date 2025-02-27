@@ -22,6 +22,14 @@
 			@dragendBar="updateGanttTask"
 			@dblclickBar="openTask"
 		>
+			<template #upper-timeunit="{date}">
+				<div>
+					{{ 
+						`${date.toLocaleString('default', { month: 'long' })}`
+					}}
+					[{{ `${countSponsorsInMonth(date)}` }} / {{ `${countPublishDays(date)}` }}]
+				</div>
+			</template>
 			<template #timeunit="{date}">
 				<div
 					class="timeunit-wrapper"
@@ -162,6 +170,60 @@ const params = ref<TaskFilterParams>({
 	filter_include_nulls: false,
 	s: '',
 })
+
+// TODO do not hardcode publish dates, let the user decide
+function countPublishDays(d: Date) {
+	// Get the first day of the month
+	const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+
+	// Get the last day of the month
+	const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+
+	// Initialize a counter for Mondays
+	let mondaysCount = 0;
+
+	// Loop through each day in the month
+	let currentDay = firstDay;
+	while (currentDay <= lastDay) {
+	if (currentDay.getDay() === 1) {
+		mondaysCount++;
+	}
+	// Move to the next day
+	currentDay.setDate(currentDay.getDate() + 1);
+	}
+
+	return mondaysCount;
+}
+
+function countSponsorsInMonth(d: Date) {
+	let count = 0;
+
+	// Sponsored tasks/content will have "sponsor" in the description field.
+	const isSponsorTask = (task) => task.labels.some((label) => label.description.toLowerCase().includes("sponsor"));
+	// Check if task VISUALLY ends withn the specified month. 
+	// Example: If a task ends the 31th of the month, the gantt will only display it until the 30th which is
+	// the last "full" day being covered. 
+	// If we want the gantt to show the end date INCLUSIVELY we need to make the task end 1 day later, 
+	// so in this case, the 1st day of the subsequent month. 
+	// But then, we have to account for that when counting publish dates...
+	const isValidDate = (taskEndDay, taskEndMonth, taskEndYear, targetMonth, d) =>
+	(taskEndDay > 1 && taskEndMonth === targetMonth && taskEndYear === d.getFullYear()) ||
+	(taskEndDay === 1 && taskEndMonth === targetMonth + 1 && taskEndYear === d.getFullYear());
+
+	tasks.value.forEach(task => {
+		if (task.endDate) {
+			const taskEndMonth = task.endDate.getMonth();
+			const taskEndDay = task.endDate.getDate();
+			const taskEndYear = task.endDate.getFullYear()
+			const targetMonth = d.getMonth();
+			
+			if (isValidDate(taskEndDay, taskEndMonth, taskEndYear, targetMonth, d) && isSponsorTask(task)) {
+				count++;
+			}
+		}
+	});
+	return count;
+}
 
 function findBucketForTask(t: ITask){
 	const kanbanStore = useKanbanStore()
