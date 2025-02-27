@@ -199,7 +199,6 @@ library.add(faFaceLaugh)
 library.add(faBomb)
 library.add(faExclamationTriangle)
 library.add(faLightbulb)
-library.add(faBolt)
 
 // overwriting the wrong types
 export default FontAwesomeIcon as unknown as FontAwesomeIconFixedTypes
