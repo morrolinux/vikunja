@@ -74,6 +74,11 @@ async function newLabel() {
 	}
 	showError.value = false
 
+	// split label title and description (if provided)
+	const [title, description] = label.value.title.split(':');
+	label.value.title = title
+	label.value.description = description
+
 	const newLabel = await labelStore.createLabel(label.value)
 	router.push({
 		name: 'labels.index',
