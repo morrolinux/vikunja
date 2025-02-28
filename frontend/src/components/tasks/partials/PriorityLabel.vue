@@ -1,6 +1,6 @@
 <template>
 	<span
-		v-if="!done && (showAll || priority >= priorities.LOW)"
+		v-if="!done && (showAll || priority >= minimumPriority)"
 		:class="{
 			'not-so-high': priority > priorities.LOW && priority < priorities.HIGH,
 			'high-priority': priority >= priorities.HIGH
@@ -8,7 +8,7 @@
 		class="priority-label"
 	>
 		<span
-			v-if="priority >= priorities.LOW"
+			v-if="priority >= minimumPriority"
 			class="icon"
 		>
 			<Icon
@@ -44,7 +44,9 @@
 </template>
 
 <script setup lang="ts">
+import {computed} from 'vue'
 import {PRIORITIES as priorities} from '@/constants/priorities'
+import {useAuthStore} from '@/stores/auth'
 	
 withDefaults(defineProps<{
 	priority: number,
@@ -54,6 +56,12 @@ withDefaults(defineProps<{
 	priority: priorities.UNSET,
 	showAll: false,
 	done: false,
+})
+
+const authStore = useAuthStore()
+
+const minimumPriority = computed(() => {
+	return authStore.settings.frontendSettings.minimumPriority
 })
 </script>
 

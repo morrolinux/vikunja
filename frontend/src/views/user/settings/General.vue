@@ -35,20 +35,46 @@
 			</label>
 			<ProjectSearch v-model="defaultProject" />
 		</div>
-		<div class="field">
-			<label class="label">
-				{{ $t('user.settings.general.defaultView') }}
-			</label>
-			<div class="select">
-				<select v-model="settings.frontendSettings.defaultView">
-					<option
-						v-for="view in DEFAULT_PROJECT_VIEW_SETTINGS"
-						:key="view"
-						:value="view"
-					>
-						{{ $t(`project.${view}.title`) }}
-					</option>
-				</select>
+		<div class="rows">
+			<div class="field">
+				<label class="label">
+					{{ $t('user.settings.general.defaultView') }}
+				</label>
+				<div class="select">
+					<select v-model="settings.frontendSettings.defaultView">
+						<option
+							v-for="view in DEFAULT_PROJECT_VIEW_SETTINGS"
+							:key="view"
+							:value="view"
+						>
+							{{ $t(`project.${view}.title`) }}
+						</option>
+					</select>
+				</div>
+			</div>
+			<div class="field">
+				<label class="label">
+					{{ $t('user.settings.general.minimumPriority') }}
+				</label>
+				<div class="select expand">
+					<select v-model="settings.frontendSettings.minimumPriority">
+						<option :value="PRIORITIES.LOW">
+							{{ $t('task.priority.low') }}
+						</option>
+						<option :value="PRIORITIES.MEDIUM">
+							{{ $t('task.priority.medium') }}
+						</option>
+						<option :value="PRIORITIES.HIGH">
+							{{ $t('task.priority.high') }}
+						</option>
+						<option :value="PRIORITIES.URGENT">
+							{{ $t('task.priority.urgent') }}
+						</option>
+						<option :value="PRIORITIES.DO_NOW">
+							{{ $t('task.priority.doNow') }}
+						</option>
+					</select>
+				</div>
 			</div>
 		</div>
 		<div
@@ -247,6 +273,7 @@ import {useAuthStore} from '@/stores/auth'
 import type {IUserSettings} from '@/modelTypes/IUserSettings'
 import {isSavedFilter} from '@/services/savedFilter'
 import {DEFAULT_PROJECT_VIEW_SETTINGS} from '@/modelTypes/IProjectView'
+import {PRIORITIES} from '@/constants/priorities'
 
 const {t} = useI18n({useScope: 'global'})
 useTitle(() => `${t('user.settings.general.title')} - ${t('user.settings.title')}`)
@@ -288,6 +315,8 @@ const settings = ref<IUserSettings>({
 		...authStore.settings.frontendSettings,
 		// Add fallback for old settings that don't have the default view set
 		defaultView: authStore.settings.frontendSettings.defaultView ?? DEFAULT_PROJECT_VIEW_SETTINGS.FIRST,
+		// Add fallback for old settings that don't have the minimum priority set
+		minimumPriority: authStore.settings.frontendSettings.minimumPriority ?? PRIORITIES.HIGH,
 	},
 })
 const id = ref(createRandomID())
@@ -336,6 +365,16 @@ async function updateSettings() {
 
 <style scoped>
 .select select {
+	width: 100%;
+}
+
+.rows {
+	display: flex;
+	flex-direction: row;
+	gap: 2rem;
+}
+
+.expand {
 	width: 100%;
 }
 </style>

@@ -100,6 +100,7 @@
         "timezone": "Time zone",
         "overdueTasksRemindersTime": "Hora de envío del correo electrónico de tareas pendientes",
         "filterUsedOnOverview": "Filtro guardado utilizado en la página de resumen",
+        "minimumPriority": "Minimum visible task priority",
         "externalUserNameChange": "Your name is managed by your login provider ({provider}). To change it, please update it there instead."
       },
       "totp": {
