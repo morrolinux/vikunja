@@ -13,6 +13,7 @@ import {
 	faBars,
 	faBell,
 	faBolt,
+	faBomb,
 	faCalendar,
 	faCheck,
 	faCheckDouble,
@@ -29,6 +30,7 @@ import {
 	faEllipsisH,
 	faEllipsisV,
 	faExclamationCircle,
+	faExclamationTriangle,
 	faEye,
 	faEyeSlash,
 	faFile,
@@ -42,6 +44,7 @@ import {
 	faImage,
 	faKeyboard,
 	faLayerGroup,
+	faLightbulb,
 	faList,
 	faListOl,
 	faLock,
@@ -193,6 +196,9 @@ library.add(faFont)
 library.add(faRulerHorizontal)
 library.add(faUnderline)
 library.add(faFaceLaugh)
+library.add(faBomb)
+library.add(faExclamationTriangle)
+library.add(faLightbulb)
 
 // overwriting the wrong types
 export default FontAwesomeIcon as unknown as FontAwesomeIconFixedTypes
