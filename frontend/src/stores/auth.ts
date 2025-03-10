@@ -8,7 +8,7 @@ import UserModel, {getAvatarUrl, getDisplayName} from '@/models/user'
 import UserSettingsService from '@/services/userSettings'
 import {getToken, refreshToken, removeToken, saveToken} from '@/helpers/auth'
 import {setModuleLoading} from '@/stores/helper'
-import {success} from '@/message'
+import {success, error} from '@/message'
 import {
 	getRedirectUrlFromCurrentFrontendPath,
 	redirectToProvider,
@@ -23,16 +23,30 @@ import {MILLISECONDS_A_SECOND} from '@/constants/date'
 import {PrefixMode} from '@/modules/parseTaskText'
 import type {IProvider} from '@/types/IProvider'
 
-function redirectToProviderIfNothingElseIsEnabled() {
+function redirectToSpecifiedProvider() {
+
 	const {auth} = useConfigStore()
-	if (
-		auth.local.enabled === false &&
-		auth.openidConnect.enabled &&
-		auth.openidConnect.providers?.length === 1 &&
-		(window.location.pathname.startsWith('/login') || window.location.pathname === '/') && // Kinda hacky, but prevents an endless loop.
-		window.location.search.includes('redirectToProvider=true')
-	) {
-		redirectToProvider(auth.openidConnect.providers[0])
+	const searchParams = new URLSearchParams(window.location.search)
+	if (searchParams.has('redirectToProvider')) {
+
+		const redirectToProviderValue = searchParams.get('redirectToProvider')
+
+		if (
+			auth.openidConnect.providers?.length === 1
+			&& (window.location.pathname.startsWith('/login') || window.location.pathname === '/') // Kinda hacky, but prevents an endless loop.
+			&& (redirectToProviderValue === null
+				|| redirectToProviderValue === 'true'
+				|| redirectToProviderValue === '1')
+ 		) {
+			redirectToProvider(auth.openidConnect.providers[0])
+		}
+
+		// let's try to find the provider to logon to !
+		const wantedProvider = auth.openidConnect.providers?.find(p => p.key === redirectToProviderValue)
+		if (wantedProvider) {
+			redirectToProvider(wantedProvider)
+		}
+		console.warn(`Could not find provider to redirect to.\nWanted: ${wantedProvider}\nAvailable: ${auth.openidConnect.providers?.map(p => p.key)}`)
 	}
 }
 
@@ -178,13 +192,25 @@ export const useAuthStore = defineStore('auth', () => {
 	 * Registers a new user and logs them in.
 	 * Not sure if this is the right place to put the logic in, maybe a seperate js component would be better suited. 
 	 */
-	async function register(credentials) {
+	async function register(credentials, language: string|null = null) {
 		const HTTP = HTTPFactory()
 		setIsLoading(true)
+		
+		if (!language) {
+			language = i18n.global.locale.value ?? getBrowserLanguage()
+		}
+		
 		try {
-			await HTTP.post('register', credentials)
+			await HTTP.post('register', {
+				...credentials,
+				language,
+			})
 			return login(credentials)
 		} catch (e) {
+			if (e.response?.data?.code === 2002 && e.response?.data?.invalid_fields[0]?.startsWith('language:')) {
+				return register(credentials, 'en')
+			}
+			
 			if (e.response?.data?.message) {
 				throw e.response.data
 			}
@@ -273,7 +299,7 @@ export const useAuthStore = defineStore('auth', () => {
 		setAuthenticated(isAuthenticated)
 		if (!isAuthenticated) {
 			setUser(null)
-			redirectToProviderIfNothingElseIsEnabled()
+			redirectToSpecifiedProvider()
 		}
 		
 		return Promise.resolve(authenticated)
@@ -302,23 +328,6 @@ export const useAuthStore = defineStore('auth', () => {
 			setUser(newUser)
 			updateLastUserRefresh()
 
-			if (
-				newUser.type === AUTH_TYPES.USER &&
-					(
-						typeof newUser.settings.language === 'undefined' ||
-						newUser.settings.language === ''
-					)
-			) {
-				// save current language
-				await saveUserSettings({
-					settings: {
-						...settings.value,
-						language: settings.value.language ? settings.value.language : getBrowserLanguage(),
-					},
-					showMessage: false,
-				})
-			}
-
 			return newUser
 		} catch (e) {
 			if((e?.response?.status >= 400 && e?.response?.status < 500) ||
@@ -326,8 +335,6 @@ export const useAuthStore = defineStore('auth', () => {
 				await logout()
 				return
 			}
-			
-			console.log('continuerd')
 			
 			const cause = {e}
 			
@@ -387,7 +394,7 @@ export const useAuthStore = defineStore('auth', () => {
 				success({message: i18n.global.t('user.settings.general.savedSuccess')})
 			}
 		} catch (e) {
-			throw new Error('Error while saving user settings:', {cause: e})
+			error(e)
 		} finally {
 			cancel()
 		}
@@ -426,7 +433,7 @@ export const useAuthStore = defineStore('auth', () => {
 		await checkAuth()
 
 		// if configured, redirect to OIDC Provider on logout
-		const fullProvider: IProvider = configStore.auth.openidConnect.providers?.find((p: IProvider) => p.key === loggedInVia)
+		const fullProvider: IProvider|undefined = configStore.auth.openidConnect.providers?.find((p: IProvider) => p.key === loggedInVia)
 		if (fullProvider) {
 			redirectToProviderOnLogout(fullProvider)
 		}

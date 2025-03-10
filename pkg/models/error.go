@@ -1332,7 +1332,11 @@ const ErrCodeOIDCTeamDoesNotExist = 6008
 
 // HTTPError holds the http error description
 func (err ErrOIDCTeamDoesNotExist) HTTPError() web.HTTPError {
-	return web.HTTPError{HTTPCode: http.StatusNotFound, Code: ErrCodeTeamDoesNotExist, Message: "No team could be found for the given OIDC ID and issuer."}
+	return web.HTTPError{
+		HTTPCode: http.StatusNotFound,
+		Code:     ErrCodeTeamDoesNotExist,
+		Message:  "No team could be found for the given OIDC ID and issuer.",
+	}
 }
 
 // ErrOIDCTeamsDoNotExistForUser represents an error where an oidcTeam does not exist for the user
@@ -1355,7 +1359,11 @@ const ErrCodeOIDCTeamsDoNotExistForUser = 6009
 
 // HTTPError holds the http error description
 func (err ErrOIDCTeamsDoNotExistForUser) HTTPError() web.HTTPError {
-	return web.HTTPError{HTTPCode: http.StatusNotFound, Code: ErrCodeTeamDoesNotExist, Message: "No Teams with property oidcId could be found for User."}
+	return web.HTTPError{
+		HTTPCode: http.StatusNotFound,
+		Code:     ErrCodeOIDCTeamsDoNotExistForUser,
+		Message:  "No Teams with property oidcId could be found for User.",
+	}
 }
 
 // ====================
@@ -1755,7 +1763,7 @@ func (err *ErrUnknownSubscriptionEntityType) Error() string {
 const ErrCodeUnknownSubscriptionEntityType = 12001
 
 // HTTPError holds the http error description
-func (err ErrUnknownSubscriptionEntityType) HTTPError() web.HTTPError {
+func (err *ErrUnknownSubscriptionEntityType) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusPreconditionFailed,
 		Code:     ErrCodeUnknownSubscriptionEntityType,
@@ -1784,7 +1792,7 @@ func (err *ErrSubscriptionAlreadyExists) Error() string {
 const ErrCodeSubscriptionAlreadyExists = 12002
 
 // HTTPError holds the http error description
-func (err ErrSubscriptionAlreadyExists) HTTPError() web.HTTPError {
+func (err *ErrSubscriptionAlreadyExists) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusPreconditionFailed,
 		Code:     ErrCodeSubscriptionAlreadyExists,
@@ -1810,7 +1818,7 @@ func (err *ErrMustProvideUser) Error() string {
 const ErrCodeMustProvideUser = 12003
 
 // HTTPError holds the http error description
-func (err ErrMustProvideUser) HTTPError() web.HTTPError {
+func (err *ErrMustProvideUser) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusPreconditionFailed,
 		Code:     ErrCodeMustProvideUser,
@@ -1841,7 +1849,7 @@ func (err *ErrLinkSharePasswordRequired) Error() string {
 const ErrCodeLinkSharePasswordRequired = 13001
 
 // HTTPError holds the http error description
-func (err ErrLinkSharePasswordRequired) HTTPError() web.HTTPError {
+func (err *ErrLinkSharePasswordRequired) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusPreconditionFailed,
 		Code:     ErrCodeLinkSharePasswordRequired,
@@ -1868,7 +1876,7 @@ func (err *ErrLinkSharePasswordInvalid) Error() string {
 const ErrCodeLinkSharePasswordInvalid = 13002
 
 // HTTPError holds the http error description
-func (err ErrLinkSharePasswordInvalid) HTTPError() web.HTTPError {
+func (err *ErrLinkSharePasswordInvalid) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusForbidden,
 		Code:     ErrCodeLinkSharePasswordInvalid,
@@ -1894,7 +1902,7 @@ func (err *ErrLinkShareTokenInvalid) Error() string {
 const ErrCodeLinkShareTokenInvalid = 13003
 
 // HTTPError holds the http error description
-func (err ErrLinkShareTokenInvalid) HTTPError() web.HTTPError {
+func (err *ErrLinkShareTokenInvalid) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusBadRequest,
 		Code:     ErrCodeLinkShareTokenInvalid,
@@ -1924,7 +1932,7 @@ func (err *ErrAPITokenInvalid) Error() string {
 const ErrCodeAPITokenInvalid = 14001
 
 // HTTPError holds the http error description
-func (err ErrAPITokenInvalid) HTTPError() web.HTTPError {
+func (err *ErrAPITokenInvalid) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusBadRequest,
 		Code:     ErrCodeAPITokenInvalid,
@@ -1952,10 +1960,38 @@ func (err *ErrInvalidAPITokenPermission) Error() string {
 const ErrCodeInvalidAPITokenPermission = 14002
 
 // HTTPError holds the http error description
-func (err ErrInvalidAPITokenPermission) HTTPError() web.HTTPError {
+func (err *ErrInvalidAPITokenPermission) HTTPError() web.HTTPError {
 	return web.HTTPError{
 		HTTPCode: http.StatusBadRequest,
 		Code:     ErrCodeInvalidAPITokenPermission,
 		Message:  fmt.Sprintf("The permission %s of group %s is invalid.", err.Permission, err.Group),
 	}
+}
+
+// OIDC errors
+const ErrCodeOpenIDError = 15001
+
+type ErrOpenIDBadRequest struct {
+	Message string
+}
+
+func (err *ErrOpenIDBadRequest) Error() string {
+	return err.Message
+}
+
+func (err *ErrOpenIDBadRequest) HTTPError() web.HTTPError {
+	return web.HTTPError{
+		HTTPCode: http.StatusBadRequest,
+		Code:     ErrCodeOpenIDError,
+		Message:  err.Message,
+	}
+}
+
+type ErrOpenIDBadRequestWithDetails struct {
+	Message string
+	Details interface{}
+}
+
+func (err *ErrOpenIDBadRequestWithDetails) Error() string {
+	return err.Message
 }

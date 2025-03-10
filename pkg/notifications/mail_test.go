@@ -97,7 +97,7 @@ func TestRenderMail(t *testing.T) {
 			Greeting("Hi there,").
 			Line("This is a line")
 
-		mailopts, err := RenderMail(mail)
+		mailopts, err := RenderMail(mail, "en")
 		require.NoError(t, err)
 		assert.Equal(t, mail.from, mailopts.From)
 		assert.Equal(t, mail.to, mailopts.To)
@@ -159,7 +159,7 @@ This is a line
 			Line("This should be an outro line").
 			Line("And one more, because why not?")
 
-		mailopts, err := RenderMail(mail)
+		mailopts, err := RenderMail(mail, "en")
 		require.NoError(t, err)
 		assert.Equal(t, mail.from, mailopts.From)
 		assert.Equal(t, mail.to, mailopts.To)
@@ -227,7 +227,7 @@ And one more, because why not?
 
 	<div style="color: #9CA3AF;font-size:12px;border-top: 1px solid #dbdbdb;margin-top:20px;padding-top:20px;">
 	<p>
-		If the button above doesn't work, copy the url below and paste it in your browser's address bar:<br/>
+		If the button above doesn&#39;t work, copy the url below and paste it in your browser&#39;s address bar:<br/>
 		https://example.com
 	</p>
 
@@ -249,7 +249,7 @@ And one more, because why not?
 			Line("This is a line").
 			FooterLine("This is a footer line")
 
-		mailopts, err := RenderMail(mail)
+		mailopts, err := RenderMail(mail, "en")
 		require.NoError(t, err)
 		assert.Equal(t, mail.from, mailopts.From)
 		assert.Equal(t, mail.to, mailopts.To)
@@ -321,7 +321,7 @@ This is a footer line
 			Line("And one more, because why not?").
 			FooterLine("This is a footer line")
 
-		mailopts, err := RenderMail(mail)
+		mailopts, err := RenderMail(mail, "en")
 		require.NoError(t, err)
 		assert.Equal(t, mail.from, mailopts.From)
 		assert.Equal(t, mail.to, mailopts.To)
@@ -391,7 +391,7 @@ This is a footer line
 
 	<div style="color: #9CA3AF;font-size:12px;border-top: 1px solid #dbdbdb;margin-top:20px;padding-top:20px;">
 	<p>
-		If the button above doesn't work, copy the url below and paste it in your browser's address bar:<br/>
+		If the button above doesn&#39;t work, copy the url below and paste it in your browser&#39;s address bar:<br/>
 		https://example.com
 	</p>
 

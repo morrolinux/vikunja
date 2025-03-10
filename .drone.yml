@@ -138,7 +138,7 @@ steps:
       event: [ push, tag, pull_request ]
 
   - name: api-lint
-    image: golangci/golangci-lint:v1.61.0
+    image: golangci/golangci-lint:v1.64.5
     pull: always
     environment:
       GOPROXY: 'https://goproxy.kolaente.de'
@@ -146,6 +146,18 @@ steps:
     commands:
       - export "GOROOT=$(go env GOROOT)"
       - ./mage-static check:golangci
+    when:
+      event: [ push, tag, pull_request ]
+
+  - name: api-check-translations
+    image: vikunja/golang-build:latest
+    pull: always
+    environment:
+      GOPROXY: 'https://goproxy.kolaente.de'
+    depends_on: [ mage ]
+    commands:
+      - export "GOROOT=$(go env GOROOT)"
+      - ./mage-static check:translations
     when:
       event: [ push, tag, pull_request ]
 
@@ -1071,16 +1083,22 @@ steps:
         from_secret: crowdin_key
       project_id: 462614
       target: download
-      download_to: frontend/src/i18n/lang/
+      download_to: i18n/lang/
       download_export_approved_only: true
-
+  
   - name: move-files
     pull: always
     image: bash
     depends_on:
       - download
     commands:
-      - mv frontend/src/i18n/lang/*/*.json frontend/src/i18n/lang
+      - mv i18n/lang/*/frontend-*.json frontend/src/i18n/lang
+      - cd frontend/src/i18n/lang
+      - for file in frontend-*; do mv "$file" "${file#frontend-}"; done
+      - cd ../../../..
+      - mv i18n/lang/*/api-*.json pkg/i18n/lang
+      - cd pkg/i18n/lang
+      - for file in api-*; do mv "$file" "${file#api-}"; done
 
   - name: push
     pull: always
@@ -1109,6 +1127,7 @@ steps:
       target: upload
       upload_files:
         frontend/src/i18n/lang/en.json: en.json
+        pkg/i18n/lang/en.json: en-api.json
 
 ---
 kind: pipeline
@@ -1189,6 +1208,6 @@ steps:
 
 ---
 kind: signature
-hmac: df9858e2b37dfddccd4892f007bbe69a61321352e94ebcf6adf82fa6560665bb
+hmac: 43e10a9537190af3e753d44cf7bfdb4080af9e2fc8306381b7195c676571e6b3
 
 ...

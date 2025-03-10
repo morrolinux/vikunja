@@ -22,6 +22,7 @@ import (
 
 	"code.vikunja.io/api/pkg/config"
 	"code.vikunja.io/api/pkg/db"
+	"code.vikunja.io/api/pkg/i18n"
 	"code.vikunja.io/api/pkg/log"
 	"code.vikunja.io/api/pkg/mail"
 )
@@ -38,6 +39,8 @@ func SetupTests() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	i18n.Init()
 }
 
 // TestMain is the main test function used to bootstrap the test env

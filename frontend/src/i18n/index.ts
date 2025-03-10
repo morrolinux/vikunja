@@ -2,6 +2,14 @@ import {createI18n} from 'vue-i18n'
 import type {PluralizationRule} from 'vue-i18n'
 import langEN from './lang/en.json'
 
+import localizedFormat from 'dayjs/plugin/localizedFormat'
+import relativeTime from 'dayjs/plugin/relativeTime'
+import dayjs from 'dayjs'
+import {loadDayJsLocale} from '@/i18n/useDayjsLanguageSync.ts'
+
+dayjs.extend(localizedFormat)
+dayjs.extend(relativeTime)
+
 export const SUPPORTED_LOCALES = {
 	'en': 'English',
 	'de-DE': 'Deutsch',
@@ -29,6 +37,7 @@ export const SUPPORTED_LOCALES = {
 	'bg-BG': 'Български',
 	'ko-KR': '한국어',
 	// IMPORTANT: Also add new languages to useDayjsLanguageSync
+	// IMPORTANT: Also add new languages to pkg/i18n/i18n.go
 } as const
 
 export type SupportedLocale = keyof typeof SUPPORTED_LOCALES
@@ -67,7 +76,7 @@ export const i18n = createI18n({
 
 export async function setLanguage(lang: SupportedLocale): Promise<SupportedLocale | undefined> {
 	if (!lang) {
-		throw new Error()
+		throw new Error('language is empty')
 	}
 
 	// do not change language to the current one
@@ -85,6 +94,8 @@ export async function setLanguage(lang: SupportedLocale): Promise<SupportedLocal
 			return setLanguage(getBrowserLanguage())
 		}
 	}
+	
+	await loadDayJsLocale(lang)
 
 	i18n.global.locale.value = lang
 	document.documentElement.lang = lang

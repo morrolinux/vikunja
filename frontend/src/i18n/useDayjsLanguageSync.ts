@@ -5,7 +5,7 @@ import {i18n, type ISOLanguage, type SupportedLocale} from '@/i18n'
 
 export const DAYJS_LOCALE_MAPPING = {
 	'de-de': 'de',
-	'de-swiss': 'de-at',
+	'de-swiss': 'de-ch',
 	'ru-ru': 'ru',
 	'fr-fr': 'fr',
 	'vi-vn': 'vi',
@@ -15,24 +15,24 @@ export const DAYJS_LOCALE_MAPPING = {
 	'nl-nl': 'nl',
 	'pt-pt': 'pt',
 	'zh-cn': 'zh-cn',
-	'no-NO': 'nn',
-	'es-ES': 'es',
-	'da-DK': 'da',
-	'ja-JP': 'ja',
-	'hu-HU': 'hu',
-	'ar-SA': 'ar-sa',
-	'sl-SI': 'sl',
-	'pt-BR': 'pt',
-	'hr-HR': 'hr',
-	'uk-UA': 'uk',
-	'lt-LT': 'lt',
-	'bg-BG': 'bg',
-	'ko-KR': 'ko',
+	'no-no': 'nn',
+	'es-es': 'es',
+	'da-dk': 'da',
+	'ja-jp': 'ja',
+	'hu-hu': 'hu',
+	'ar-sa': 'ar-sa',
+	'sl-si': 'sl',
+	'pt-br': 'pt',
+	'hr-hr': 'hr',
+	'uk-ua': 'uk',
+	'lt-lt': 'lt',
+	'bg-bg': 'bg',
+	'ko-kr': 'ko',
 } as Record<SupportedLocale, ISOLanguage>
 
 export const DAYJS_LANGUAGE_IMPORTS = {
 	'de-de': () => import('dayjs/locale/de'),
-	'de-swiss': () => import('dayjs/locale/de-at'),
+	'de-swiss': () => import('dayjs/locale/de-ch'),
 	'ru-ru': () => import('dayjs/locale/ru'),
 	'fr-fr': () => import('dayjs/locale/fr'),
 	'vi-vn': () => import('dayjs/locale/vi'),
@@ -50,11 +50,20 @@ export const DAYJS_LANGUAGE_IMPORTS = {
 	'ar-sa': () => import('dayjs/locale/ar-sa'),
 	'sl-si': () => import('dayjs/locale/sl'),
 	'pt-br': () => import('dayjs/locale/pt-br'),
+	'hr-hr': () => import('dayjs/locale/hr'),
 	'uk-ua': () => import('dayjs/locale/uk'),
 	'lt-lt': () => import('dayjs/locale/lt'),
 	'bg-bg': () => import('dayjs/locale/bg'),
 	'ko-kr': () => import('dayjs/locale/ko'),
 } as Record<SupportedLocale, () => Promise<ILocale>>
+
+export async function loadDayJsLocale(language: SupportedLocale) {
+	if (language === 'en') {
+		return
+	}
+	
+	await DAYJS_LANGUAGE_IMPORTS[language.toLowerCase()]()
+}
 
 export function useDayjsLanguageSync(dayjsGlobal: typeof dayjs) {
 
@@ -70,7 +79,7 @@ export function useDayjsLanguageSync(dayjsGlobal: typeof dayjs) {
 			if (dayjsLanguageLoaded.value) {
 				return
 			}
-			await DAYJS_LANGUAGE_IMPORTS[currentLanguage.toLowerCase()]()
+			await loadDayJsLocale(currentLanguage)
 			dayjsGlobal.locale(dayjsLanguageCode)
 			dayjsLanguageLoaded.value = true
 		},
