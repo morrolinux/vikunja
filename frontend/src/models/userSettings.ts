@@ -4,6 +4,7 @@ import type {IFrontendSettings, IUserSettings} from '@/modelTypes/IUserSettings'
 import {getBrowserLanguage} from '@/i18n'
 import {PrefixMode} from '@/modules/parseTaskText'
 import {DEFAULT_PROJECT_VIEW_SETTINGS} from '@/modelTypes/IProjectView'
+import {PRIORITIES} from '@/constants/priorities'
 
 export default class UserSettingsModel extends AbstractModel<IUserSettings> implements IUserSettings {
 	name = ''
@@ -11,7 +12,7 @@ export default class UserSettingsModel extends AbstractModel<IUserSettings> impl
 	discoverableByName = false
 	discoverableByEmail = false
 	overdueTasksRemindersEnabled = true
-	overdueTasksRemindersTime = undefined
+	overdueTasksRemindersTime = ''
 	defaultProjectId = undefined
 	weekStart = 0 as IUserSettings['weekStart']
 	timezone = ''
@@ -20,7 +21,9 @@ export default class UserSettingsModel extends AbstractModel<IUserSettings> impl
 		playSoundWhenDone: true,
 		quickAddMagicMode: PrefixMode.Default,
 		colorSchema: 'auto',
+		filterIdUsedOnOverview: null,
 		defaultView: DEFAULT_PROJECT_VIEW_SETTINGS.FIRST,
+		minimumPriority: PRIORITIES.HIGH,
 	}
 
 	constructor(data: Partial<IUserSettings> = {}) {

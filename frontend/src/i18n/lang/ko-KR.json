@@ -100,6 +100,7 @@
         "timezone": "시간대",
         "overdueTasksRemindersTime": "기한이 지난 할 일 이메일 알림 시간",
         "filterUsedOnOverview": "개요 페이지에 사용되는 저장된 필터",
+        "minimumPriority": "Minimum visible task priority",
         "externalUserNameChange": "Your name is managed by your login provider ({provider}). To change it, please update it there instead."
       },
       "totp": {
