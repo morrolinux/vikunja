@@ -118,7 +118,7 @@ const {
 	updateTask,
 } = useGanttFilters(route, viewId)
 
-const compactView = ref(false)
+const compactView = ref(true)
 
 const DEFAULT_DATE_RANGE_DAYS = 7
 
