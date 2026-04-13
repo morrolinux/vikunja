@@ -38,6 +38,12 @@
 					>
 						{{ $t('task.show.noDates') }}
 					</FancyCheckbox>
+					<FancyCheckbox
+						v-model="compactView"
+						is-block
+					>
+						{{ $t('project.gantt.compactView') }}
+					</FancyCheckbox>
 				</div>
 			</Card>
 
@@ -53,6 +59,7 @@
 						:is-loading="isLoading"
 						:default-task-start-date="defaultTaskStartDate"
 						:default-task-end-date="defaultTaskEndDate"
+						:compact-view="compactView"
 						@update:task="updateTask"
 					/>
 					<TaskForm
@@ -110,6 +117,8 @@ const {
 	addTask,
 	updateTask,
 } = useGanttFilters(route, viewId)
+
+const compactView = ref(false)
 
 const DEFAULT_DATE_RANGE_DAYS = 7
 

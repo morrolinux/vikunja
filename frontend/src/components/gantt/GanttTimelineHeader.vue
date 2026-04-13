@@ -18,7 +18,7 @@
 				role="columnheader"
 				:aria-label="$t('project.gantt.monthLabel', {month: monthGroup.label})"
 			>
-				{{ monthGroup.label }}
+				{{ monthGroup.label }} {{ monthGroup.sponsorInfo }}
 			</div>
 		</div>
         
@@ -46,7 +46,7 @@
 			>
 				<div
 					class="timeunit-wrapper"
-					:class="{'today': dateIsToday(date)}"
+					:class="{'today': dateIsToday(date), 'special-day': dateIsSpecial(date)}"
 				>
 					<span>{{ date.getDate() }}</span>
 					<span class="weekday">
@@ -64,9 +64,12 @@ import {useGlobalNow} from '@/composables/useGlobalNow'
 import {useWeekDayFromDate} from '@/helpers/time/formatDate'
 import dayjs from 'dayjs'
 
+import type {ITask} from '@/modelTypes/ITask'
+
 const props = defineProps<{
     timelineData: Date[]
     dayWidthPixels: number
+    tasks?: Map<ITask['id'], ITask>
 }>()
 
 const weekDayFromDate = useWeekDayFromDate()
@@ -76,6 +79,49 @@ const dateIsToday = computed(() => {
 	const todayStr = today.value.toDateString()
 	return (date: Date) => date.toDateString() === todayStr
 })
+
+function dateIsSpecial(date: Date): boolean {
+	return date.getDay() === 1
+}
+
+// TODO: do not hardcode publish dates, let the user decide
+function countPublishDays(year: number, month: number): number {
+	const firstDay = new Date(year, month, 1)
+	const lastDay = new Date(year, month + 1, 0)
+	let count = 0
+	const current = new Date(firstDay)
+	while (current <= lastDay) {
+		if (current.getDay() === 1) {
+			count++
+		}
+		current.setDate(current.getDate() + 1)
+	}
+	return count
+}
+
+function countSponsorsInMonth(year: number, month: number): number {
+	if (!props.tasks) return 0
+	let count = 0
+	const isSponsorTask = (task: ITask) =>
+		task.labels.some((label) => label.description?.toLowerCase().includes('sponsor'))
+
+	props.tasks.forEach(task => {
+		if (task.endDate) {
+			const taskEndMonth = task.endDate.getMonth()
+			const taskEndDay = task.endDate.getDate()
+			const taskEndYear = task.endDate.getFullYear()
+			// Account for inclusive display: if task ends on the 1st of next month,
+			// it visually belongs to the previous month
+			const belongsToMonth =
+				(taskEndDay > 1 && taskEndMonth === month && taskEndYear === year) ||
+				(taskEndDay === 1 && taskEndMonth === month + 1 && taskEndYear === year)
+			if (belongsToMonth && isSponsorTask(task)) {
+				count++
+			}
+		}
+	})
+	return count
+}
 
 const monthGroups = computed(() => {
 	const groups = props.timelineData.reduce(
@@ -88,16 +134,19 @@ const monthGroups = computed(() => {
 			if (lastGroup?.key === key) {
 				lastGroup.width += props.dayWidthPixels
 			} else {
+				const sponsors = countSponsorsInMonth(year, month)
+				const publishDays = countPublishDays(year, month)
 				groups.push({
 					key,
 					label: dayjs(date).format('MMMM YYYY'),
 					width: props.dayWidthPixels,
+					sponsorInfo: props.tasks ? `[${sponsors} / ${publishDays}]` : '',
 				})
 			}
 
 			return groups
 		},
-		[] as Array<{key: string; label: string; width: number}>,
+		[] as Array<{key: string; label: string; width: number; sponsorInfo: string}>,
 	)
 
 	return groups
@@ -146,6 +195,12 @@ const monthGroups = computed(() => {
 				color: var(--white);
 				border-radius: 5px 5px 0 0;
 				font-weight: bold;
+			}
+
+			&.special-day:not(.today) {
+				background: #df4a33;
+				color: var(--white);
+				border-radius: 5px 5px 0 0;
 			}
 
 			.weekday {

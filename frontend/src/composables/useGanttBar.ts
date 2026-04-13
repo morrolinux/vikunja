@@ -16,6 +16,7 @@ export interface GanttBarModel {
 		isParent?: boolean
 		hasDerivedDates?: boolean
 		indentLevel?: number
+		bucketName?: string
 	}
 }
 export interface UseGanttBarOptions {

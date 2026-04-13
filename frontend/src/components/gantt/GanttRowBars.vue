@@ -2,7 +2,7 @@
 	<svg
 		class="gantt-row-bars"
 		:width="totalWidth"
-		height="40"
+		height="60"
 		xmlns="http://www.w3.org/2000/svg"
 		role="img"
 		:aria-label="$t('project.gantt.taskBarsForRow', { rowId })"
@@ -58,7 +58,7 @@
 				:x="getBarX(bar)"
 				:y="4"
 				:width="getBarWidth(bar)"
-				:height="32"
+				:height="52"
 				:rx="4"
 				:fill="getBarFillAttr(bar)"
 				:opacity="bar.meta?.isDone ? 0.5 : 1"
@@ -70,6 +70,19 @@
 				:aria-label="getBarAriaLabel(bar)"
 				:aria-pressed="isRowFocused"
 				@pointerdown="handleBarPointerDown(bar, $event)"
+			/>
+
+			<!-- Progress bar overlay -->
+			<rect
+				v-if="!bar.meta?.isParent && getBarPercentDone(bar) > 0"
+				:x="getBarX(bar)"
+				:y="4"
+				:width="getBarWidth(bar) * getBarPercentDone(bar)"
+				:height="52"
+				:rx="4"
+				fill="#ff8c00"
+				opacity="1"
+				pointer-events="none"
 			/>
 
 			<!-- Parent summary bar (full height with diamond endpoints) -->
@@ -85,7 +98,7 @@
 					:x="getBarX(bar)"
 					:y="4"
 					:width="getBarWidth(bar)"
-					:height="32"
+					:height="52"
 					:rx="4"
 					:fill="getBarFillAttr(bar)"
 					:opacity="bar.meta?.isDone ? 0.5 : 1"
@@ -117,7 +130,7 @@
 				:x="getBarX(bar) - RESIZE_HANDLE_OFFSET"
 				:y="4"
 				:width="6"
-				:height="32"
+				:height="52"
 				:rx="3"
 				fill="var(--white)"
 				stroke="var(--primary)"
@@ -134,7 +147,7 @@
 				:x="getBarX(bar) + getBarWidth(bar) - RESIZE_HANDLE_OFFSET"
 				:y="4"
 				:width="6"
-				:height="32"
+				:height="52"
 				:rx="3"
 				fill="var(--white)"
 				stroke="var(--primary)"
@@ -145,37 +158,52 @@
 				@pointerdown="startResize(bar, 'end', $event)"
 			/>
 
-			<!-- Task label with clipping -->
-			<defs>
-				<clipPath :id="`clip-${bar.id}`">
-					<rect
-						:x="getBarX(bar) + 2"
-						:y="4"
-						:width="getBarWidth(bar) - 4"
-						:height="32"
-						:rx="4"
-					/>
-				</clipPath>
-			</defs>
-			<text
-				:x="getBarTextX(bar)"
-				:y="24"
-				:text-anchor="bar.meta?.dateType === 'endOnly' ? 'end' : 'start'"
-				class="gantt-bar-text"
-				:fill="getBarTextColor(bar)"
-				:text-decoration="bar.meta?.isDone ? 'line-through' : 'none'"
-				:clip-path="`url(#clip-${bar.id})`"
+			<!-- Task label and labels with clipping -->
+			<foreignObject
+				:x="getBarX(bar)"
+				:y="4"
+				:width="getBarWidth(bar)"
+				:height="52"
 				aria-hidden="true"
 			>
-				{{ bar.meta?.label || bar.id }}
-			</text>
+				<div
+					xmlns="http://www.w3.org/1999/xhtml"
+					class="gantt-bar-content"
+					:style="{
+						color: getBarTextColor(bar),
+						textDecoration: bar.meta?.isDone ? 'line-through' : 'none',
+					}"
+				>
+					<span class="gantt-bar-title">{{ bar.meta?.label || bar.id }}</span>
+					<span class="gantt-bar-bottom-row">
+						<span
+							v-if="getTaskLabels(bar).length > 0"
+							class="gantt-bar-labels"
+						>
+							<span
+								v-for="label in getTaskLabels(bar)"
+								:key="label.id"
+								class="gantt-bar-label-badge"
+								:style="{
+									backgroundColor: label.hexColor,
+									color: label.textColor,
+								}"
+							>{{ label.title }}</span>
+						</span>
+						<small
+							v-if="bar.meta?.bucketName"
+							class="gantt-bar-bucket"
+						>{{ bar.meta.bucketName }}</small>
+					</span>
+				</div>
+			</foreignObject>
 		</GanttBarPrimitive>
 
 		<!-- Collapse/expand chevron for parent tasks — rendered after bars so it paints on top -->
 		<g
 			v-if="isParent && bars[0]"
 			class="gantt-collapse-toggle"
-			:transform="`translate(${Math.max(0, getBarX(bars[0]) - 14)}, 14)`"
+			:transform="`translate(${Math.max(0, getBarX(bars[0]) - 14)}, 24)`"
 			role="button"
 			:aria-label="isCollapsed
 				? $t('project.gantt.expandGroup', { task: bars[0]?.meta?.label || '' })
@@ -314,27 +342,18 @@ const getBarWidth = computed(() => (bar: GanttBarModel) => {
 	return computeBarWidth(bar)
 })
 
-const getBarTextX = computed(() => (bar: GanttBarModel) => {
-	if (bar.meta?.dateType === 'endOnly') {
-		return getBarX.value(bar) + getBarWidth.value(bar) - 8
-	}
-	// When the bar starts before the visible range, clamp text to the left edge
-	// so the title remains visible within the visible portion of the bar.
-	return Math.max(getBarX.value(bar) + 8, 8)
-})
-
 // Diamond endpoint helpers for parent summary bars
 const DIAMOND_SIZE = 5
 
 function getLeftDiamondPoints(bar: GanttBarModel): string {
 	const x = getBarX.value(bar) - DIAMOND_SIZE
-	const cy = 20 // vertical center of the bar
+	const cy = 30 // vertical center of the bar
 	return `${x},${cy} ${x + DIAMOND_SIZE},${cy - DIAMOND_SIZE} ${x + DIAMOND_SIZE * 2},${cy} ${x + DIAMOND_SIZE},${cy + DIAMOND_SIZE}`
 }
 
 function getRightDiamondPoints(bar: GanttBarModel): string {
 	const x = getBarX.value(bar) + getBarWidth.value(bar) + DIAMOND_SIZE
-	const cy = 20
+	const cy = 30
 	return `${x - DIAMOND_SIZE * 2},${cy} ${x - DIAMOND_SIZE},${cy - DIAMOND_SIZE} ${x},${cy} ${x - DIAMOND_SIZE},${cy + DIAMOND_SIZE}`
 }
 
@@ -432,6 +451,16 @@ function handleBarPointerDown(bar: GanttBarModel, event: PointerEvent) {
 function startResize(bar: GanttBarModel, edge: 'start' | 'end', event: PointerEvent) {
 	emit('startResize', bar, edge, event)
 }
+
+function getBarPercentDone(bar: GanttBarModel): number {
+	const task = bar.meta?.task as {percentDone?: number} | undefined
+	return task?.percentDone ?? 0
+}
+
+function getTaskLabels(bar: GanttBarModel): Array<{id: number, title: string, hexColor: string, textColor: string}> {
+	const task = bar.meta?.task as {labels?: Array<{id: number, title: string, hexColor: string, textColor: string}>} | undefined
+	return task?.labels ?? []
+}
 </script>
 
 <style scoped lang="scss">
@@ -482,6 +511,60 @@ function startResize(bar: GanttBarModel, edge: 'start' | 'end', event: PointerEv
 	font-size: .85rem;
 	pointer-events: none;
 	user-select: none;
+}
+
+.gantt-bar-content {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: flex-end;
+	gap: 2px;
+	height: 100%;
+	padding: 2px 8px;
+	overflow: hidden;
+	white-space: nowrap;
+	font-size: .8rem;
+	pointer-events: none;
+	user-select: none;
+}
+
+.gantt-bar-title {
+	font-weight: bold;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
+.gantt-bar-bottom-row {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+.gantt-bar-labels {
+	display: inline-flex;
+	gap: 2px;
+	flex-direction: row-reverse;
+	flex-shrink: 1;
+	overflow: hidden;
+}
+
+.gantt-bar-label-badge {
+	border-radius: 3px;
+	padding: 0 3px;
+	font-size: .65rem;
+	line-height: 1.4;
+	flex-shrink: 0;
+}
+
+.gantt-bar-bucket {
+	opacity: 0.7;
+	font-weight: normal;
+	font-size: .7rem;
+	flex-shrink: 0;
 }
 
 .gantt-parent-bar {

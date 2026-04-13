@@ -14,12 +14,13 @@
 			<GanttTimelineHeader
 				:timeline-data="timelineData"
 				:day-width-pixels="DAY_WIDTH_PIXELS"
+				:tasks="tasks"
 			/>
 
 			<GanttVerticalGridLines
 				:timeline-data="timelineData"
 				:total-width="totalWidth"
-				:height="ganttRows.length * 40"
+				:height="ganttRows.length * ROW_HEIGHT"
 				:day-width-pixels="DAY_WIDTH_PIXELS"
 			/>
 
@@ -111,6 +112,7 @@ import GanttTimelineHeader from '@/components/gantt/GanttTimelineHeader.vue'
 import GanttRelationArrows from '@/components/gantt/GanttRelationArrows.vue'
 import Loading from '@/components/misc/Loading.vue'
 
+import {useKanbanStore} from '@/stores/kanban'
 import {MILLISECONDS_A_DAY} from '@/constants/date'
 import {roundToNaturalDayBoundary} from '@/helpers/time/roundToNaturalDayBoundary'
 
@@ -120,6 +122,7 @@ const props = defineProps<{
 	tasks: Map<ITask['id'], ITask>,
 	defaultTaskStartDate: DateISO
 	defaultTaskEndDate: DateISO
+	compactView?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -128,7 +131,17 @@ const emit = defineEmits<{
 
 const DAY_WIDTH_PIXELS = 30
 
-const {tasks, filters} = toRefs(props)
+const kanbanStore = useKanbanStore()
+
+function findBucketNameForTask(taskId: number): string {
+	const {bucketIndex} = kanbanStore.getTaskById(taskId)
+	if (bucketIndex !== null && kanbanStore.buckets[bucketIndex]) {
+		return kanbanStore.buckets[bucketIndex].title
+	}
+	return ''
+}
+
+const {tasks, filters, compactView} = toRefs(props)
 
 const dayjsLanguageLoading = useDayjsLanguageSync(dayjs)
 const ganttContainer = ref(null)
@@ -293,8 +306,31 @@ function transformTaskToGanttBar(node: GanttTaskTreeNode): GanttBarModel {
 			isParent: node.isParent,
 			hasDerivedDates: node.hasDerivedDates,
 			indentLevel: node.indentLevel,
+			bucketName: findBucketNameForTask(t.id),
 		},
 	}
+}
+
+function doBarsOverlap(a: GanttBarModel, b: GanttBarModel): boolean {
+	return a.start < b.end && b.start < a.end
+}
+
+function packBarsIntoRows(bars: GanttBarModel[]): GanttBarModel[][] {
+	const rows: GanttBarModel[][] = []
+	for (const bar of bars) {
+		let placed = false
+		for (const row of rows) {
+			if (!row.some(existing => doBarsOverlap(existing, bar))) {
+				row.push(bar)
+				placed = true
+				break
+			}
+		}
+		if (!placed) {
+			rows.push([bar])
+		}
+	}
+	return rows
 }
 
 // Build the task tree when tasks change
@@ -308,13 +344,11 @@ watch(
 
 // Derive bars, rows, and cells from visible nodes
 watch(
-	[visibleNodes, filters],
+	[visibleNodes, filters, compactView],
 	() => {
 		const bars: GanttBarModel[] = []
-		const rows: string[] = []
-		const cells: Record<string, string[]> = {}
 
-		visibleNodes.value.forEach((node, index) => {
+		visibleNodes.value.forEach((node) => {
 			const bar = transformTaskToGanttBar(node)
 
 			// Check if task is visible in the current date range
@@ -327,26 +361,24 @@ watch(
 			}
 
 			bars.push(bar)
-
-			const rowId = `row-${index}`
-			rows.push(rowId)
-
-			const rowCells: string[] = []
-			timelineData.value.forEach((_, dayIndex) => {
-				rowCells.push(`${rowId}-cell-${dayIndex}`)
-			})
-			cells[rowId] = rowCells
 		})
 
-		ganttBars.value = bars.map(bar => [bar])
-		ganttRows.value = rows
-		cellsByRow.value = cells
+		if (compactView.value) {
+			ganttBars.value = packBarsIntoRows(bars)
+		} else {
+			ganttBars.value = bars.map(bar => [bar])
+		}
+		ganttRows.value = ganttBars.value.map((_, i) => `row-${i}`)
+		cellsByRow.value = ganttRows.value.reduce((acc, rowId) => {
+			acc[rowId] = timelineData.value.map((_, dayIndex) => `${rowId}-cell-${dayIndex}`)
+			return acc
+		}, {} as Record<string, string[]>)
 	},
 	{deep: true, immediate: true},
 )
 
 // Compute bar positions for arrow rendering
-const ROW_HEIGHT = 40
+const ROW_HEIGHT = 60
 
 const barPositions = computed(() => {
 	const positions = new Map<number, GanttBarPosition>()
@@ -780,7 +812,7 @@ onUnmounted(() => {
 
 .gantt-row-content {
 	position: relative;
-	min-block-size: 40px;
+	min-block-size: 60px;
 	inline-size: 100%;
 }
 </style>

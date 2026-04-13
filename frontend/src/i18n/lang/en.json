@@ -470,7 +470,8 @@
       "partialDatesEnd": "End date only (open-ended)",
       "expandGroup": "Expand group: {task}",
       "collapseGroup": "Collapse group: {task}",
-      "toggleRelationArrows": "Toggle relation arrows"
+      "toggleRelationArrows": "Toggle relation arrows",
+      "compactView": "Compact view"
     },
     "table": {
       "title": "Table",

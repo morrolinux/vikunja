@@ -498,7 +498,7 @@ watch(
 		}
 		collapsedBuckets.value = getCollapsedBucketState(projectId)
 		kanbanStore.loadBucketsForProject(projectId, viewId, params)
-		console.debug("params:", params)
+		console.debug('params:', params)
 	},
 	{
 		immediate: true,
