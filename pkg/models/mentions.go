@@ -18,6 +18,7 @@ package models
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 
 	"code.vikunja.io/api/pkg/log"
@@ -39,7 +40,8 @@ func FindMentionedUsersInText(s *xorm.Session, text string) (users map[int64]*us
 }
 
 // extractMentionedUsernames parses HTML content and extracts usernames from mention spans.
-// It looks for <mention-user data-id="username"> elements and returns the usernames.
+// It looks for <mention-user data-id="username"> elements and also falls back to
+// plain-text @username mentions for backwards compatibility.
 func extractMentionedUsernames(htmlText string) []string {
 	doc, err := html.Parse(strings.NewReader(htmlText))
 	if err != nil {
@@ -76,6 +78,18 @@ func extractMentionedUsernames(htmlText string) []string {
 	}
 
 	traverse(doc)
+
+	// Fallback: also look for plain-text @username mentions
+	reg := regexp.MustCompile(`@(\w+)`)
+	matches := reg.FindAllStringSubmatch(htmlText, -1)
+	for _, match := range matches {
+		username := match[1]
+		if !seen[username] {
+			usernames = append(usernames, username)
+			seen[username] = true
+		}
+	}
+
 	return usernames
 }
 
