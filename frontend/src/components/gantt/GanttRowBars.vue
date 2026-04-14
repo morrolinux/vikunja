@@ -307,11 +307,8 @@ function computeBarWidth(bar: GanttBarModel) {
 	return width
 }
 
-const originalEndX = computed(() => props.dragState?.originalEnd 
-	? computeBarX(props.dragState.originalEnd) 
-	: 0)
-const originalStartX = computed(() => props.dragState?.originalStart 
-	? computeBarX(props.dragState.originalStart) 
+const originalStartX = computed(() => props.dragState?.originalStart
+	? computeBarX(props.dragState.originalStart)
 	: 0)
 
 const getBarX = computed(() => (bar: GanttBarModel) => {
@@ -331,12 +328,10 @@ const getBarWidth = computed(() => (bar: GanttBarModel) => {
 	if (props.isResizing && props.dragState?.barId === bar.id) {
 		if (props.dragState.edge === 'start') {
 			const newStart = addDays(props.dragState.originalStart, props.dragState.currentDays)
-			const newStartX = computeBarX(newStart)
-			return Math.max(0, originalEndX.value - newStartX)
+			return Math.max(0, getDaysDifference(newStart, props.dragState.originalEnd) * props.dayWidthPixels)
 		} else {
 			const newEnd = addDays(props.dragState.originalEnd, props.dragState.currentDays)
-			const newEndX = computeBarX(newEnd)
-			return Math.max(0, newEndX - originalStartX.value)
+			return Math.max(0, getDaysDifference(props.dragState.originalStart, newEnd) * props.dayWidthPixels)
 		}
 	}
 	return computeBarWidth(bar)
