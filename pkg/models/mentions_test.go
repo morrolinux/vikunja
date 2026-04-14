@@ -95,6 +95,27 @@ func TestFindMentionedUsersInText(t *testing.T) {
 	}
 }
 
+func TestExtractMentionedUsernamesPlainTextFallback(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want []string
+	}{
+		{name: "plain text mention", text: "<p>hey @user1 look</p>", want: []string{"user1"}},
+		{name: "plain text at start", text: "@user1 look", want: []string{"user1"}},
+		{name: "mixed with mention tag", text: `<p><mention-user data-id="user2">@User Two</mention-user> and @user1</p>`, want: []string{"user2", "user1"}},
+		{name: "email is not a mention", text: "<p>mail foo@user1.com</p>", want: []string{}},
+		{name: "quoted reply does not mention", text: "<blockquote><p>@user1 said</p></blockquote><p>ok</p>", want: []string{}},
+		{name: "code does not mention", text: "<p><code>@user1</code></p>", want: []string{}},
+		{name: "deduplicated", text: "<p>@user1 @user1</p>", want: []string{"user1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, extractMentionedUsernames(tt.text))
+		})
+	}
+}
+
 func TestHandleMentionsWithNilTask(t *testing.T) {
 	t.Run("HandleTaskUpdatedMentions should not panic with nil task", func(t *testing.T) {
 		events.TestListener(t, &TaskUpdatedEvent{Task: nil, Doer: nil}, &HandleTaskUpdatedMentions{})

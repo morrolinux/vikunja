@@ -19,6 +19,7 @@ package models
 import (
 	"bytes"
 	"context"
+	"regexp"
 	"strings"
 
 	"code.vikunja.io/api/pkg/log"
@@ -39,8 +40,13 @@ func FindMentionedUsersInText(s *xorm.Session, text string) (users map[int64]*us
 	return user.GetUsersByUsername(s, usernames, true)
 }
 
+// plainTextMentionRegex matches plain-text @username mentions which are not part
+// of a larger word (e.g. an email address).
+var plainTextMentionRegex = regexp.MustCompile(`(?:^|[^\w@.])@(\w+)`)
+
 // extractMentionedUsernames parses HTML content and extracts usernames from mention spans.
-// It looks for <mention-user data-id="username"> elements and returns the usernames.
+// It looks for <mention-user data-id="username"> elements and also falls back to
+// plain-text @username mentions (outside of quotes and code) for backwards compatibility.
 func extractMentionedUsernames(htmlText string) []string {
 	doc, err := html.Parse(strings.NewReader(htmlText))
 	if err != nil {
@@ -66,6 +72,26 @@ func extractMentionedUsernames(htmlText string) []string {
 				if !seen[dataID] {
 					usernames = append(usernames, dataID)
 					seen[dataID] = true
+				}
+			}
+			return
+		}
+
+		if n.Type == html.ElementNode {
+			switch n.Data {
+			case "blockquote", "code", "pre":
+				// Quoted replies and code should not notify anyone.
+				return
+			}
+		}
+
+		// Fallback: plain-text @username mentions
+		if n.Type == html.TextNode {
+			for _, match := range plainTextMentionRegex.FindAllStringSubmatch(n.Data, -1) {
+				username := match[1]
+				if !seen[username] {
+					usernames = append(usernames, username)
+					seen[username] = true
 				}
 			}
 		}
