@@ -112,7 +112,6 @@ import GanttTimelineHeader from '@/components/gantt/GanttTimelineHeader.vue'
 import GanttRelationArrows from '@/components/gantt/GanttRelationArrows.vue'
 import Loading from '@/components/misc/Loading.vue'
 
-import {useKanbanStore} from '@/stores/kanban'
 import {MILLISECONDS_A_DAY} from '@/constants/date'
 import {roundToNaturalDayBoundary} from '@/helpers/time/roundToNaturalDayBoundary'
 
@@ -131,12 +130,9 @@ const emit = defineEmits<{
 
 const DAY_WIDTH_PIXELS = 30
 
-const kanbanStore = useKanbanStore()
-
-function findBucketNameForTask(taskId: number): string {
-	const {bucketIndex} = kanbanStore.getTaskById(taskId)
-	if (bucketIndex !== null && kanbanStore.buckets[bucketIndex]) {
-		return kanbanStore.buckets[bucketIndex].title
+function findBucketNameForTask(task: ITask): string {
+	if (task.buckets && task.buckets.length > 0) {
+		return task.buckets[0].title
 	}
 	return ''
 }
@@ -306,7 +302,7 @@ function transformTaskToGanttBar(node: GanttTaskTreeNode): GanttBarModel {
 			isParent: node.isParent,
 			hasDerivedDates: node.hasDerivedDates,
 			indentLevel: node.indentLevel,
-			bucketName: findBucketNameForTask(t.id),
+			bucketName: findBucketNameForTask(t),
 		},
 	}
 }
