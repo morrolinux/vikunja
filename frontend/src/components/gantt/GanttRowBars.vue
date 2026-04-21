@@ -174,7 +174,15 @@
 						textDecoration: bar.meta?.isDone ? 'line-through' : 'none',
 					}"
 				>
-					<span class="gantt-bar-title">{{ bar.meta?.label || bar.id }}</span>
+					<span class="gantt-bar-title-row">
+						<AssigneeList
+							v-if="getTaskAssignees(bar).length > 0"
+							:assignees="getTaskAssignees(bar)"
+							:avatar-size="20"
+							class="gantt-bar-assignees"
+						/>
+						<span class="gantt-bar-title">{{ bar.meta?.label || bar.id }}</span>
+					</span>
 					<span class="gantt-bar-bottom-row">
 						<span
 							v-if="getTaskLabels(bar).length > 0"
@@ -244,6 +252,8 @@ import {MILLISECONDS_A_DAY} from '@/constants/date'
 import {roundToNaturalDayBoundary} from '@/helpers/time/roundToNaturalDayBoundary'
 
 import GanttBarPrimitive from './primitives/GanttBarPrimitive.vue'
+import AssigneeList from '@/components/tasks/partials/AssigneeList.vue'
+import type {IUser} from '@/modelTypes/IUser'
 
 const props = defineProps<{
 	bars: GanttBarModel[]
@@ -456,6 +466,11 @@ function getTaskLabels(bar: GanttBarModel): Array<{id: number, title: string, he
 	const task = bar.meta?.task as {labels?: Array<{id: number, title: string, hexColor: string, textColor: string}>} | undefined
 	return task?.labels ?? []
 }
+
+function getTaskAssignees(bar: GanttBarModel): IUser[] {
+	const task = bar.meta?.task as {assignees?: IUser[]} | undefined
+	return task?.assignees ?? []
+}
 </script>
 
 <style scoped lang="scss">
@@ -523,11 +538,26 @@ function getTaskLabels(bar: GanttBarModel): Array<{id: number, title: string, he
 	user-select: none;
 }
 
+.gantt-bar-title-row {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+.gantt-bar-assignees {
+	flex-shrink: 0;
+	pointer-events: auto;
+}
+
 .gantt-bar-title {
 	font-weight: bold;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 100%;
+	min-width: 0;
+	flex-shrink: 1;
 }
 
 .gantt-bar-bottom-row {
