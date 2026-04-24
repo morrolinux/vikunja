@@ -206,33 +206,8 @@
 				</div>
 			</foreignObject>
 
-			<!-- Due date marker stem + diamond (draggable) -->
-			<g v-if="bar.meta?.dueDate">
-				<line
-					:x1="getDueDiamondCenterX(bar) ?? 0"
-					:x2="getDueDiamondCenterX(bar) ?? 0"
-					:y1="DUE_STEM_TOP"
-					:y2="DUE_STEM_BOTTOM"
-					stroke="var(--grey-500)"
-					stroke-width="2"
-					stroke-linecap="round"
-					pointer-events="none"
-				/>
-				<polygon
-					:points="getDueDiamondPoints(bar)"
-					fill="var(--danger)"
-					stroke="var(--white)"
-					stroke-width="1.5"
-					class="gantt-due-diamond"
-					role="button"
-					:aria-label="$t('project.gantt.dueDateMarker', { task: bar.meta?.label || bar.id })"
-					@pointerdown.stop="startDueDateDrag(bar, $event)"
-				/>
-			</g>
-
-			<!-- Hover zone to create a due date (only for bars without one) -->
+			<!-- Hover zone to create a new milestone subtask (under markers) -->
 			<rect
-				v-if="!bar.meta?.dueDate"
 				:x="getBarX(bar)"
 				:y="56"
 				:width="getBarWidth(bar)"
@@ -244,9 +219,47 @@
 				@click.stop="onDueHoverClick(bar, $event)"
 			/>
 
-			<!-- Ghost stem + diamond on hover (for bars without a due date) -->
+			<!-- Milestone markers (one per subtask with endDate) -->
 			<g
-				v-if="!bar.meta?.dueDate && hoveredDueDay?.barId === bar.id"
+				v-for="milestone in (bar.meta?.milestones ?? [])"
+				:key="milestone.taskId"
+				class="gantt-milestone-group"
+			>
+				<line
+					:x1="getMilestoneCx(bar, milestone)"
+					:x2="getMilestoneCx(bar, milestone)"
+					:y1="DUE_STEM_TOP"
+					:y2="DUE_STEM_BOTTOM"
+					stroke="var(--grey-500)"
+					stroke-width="2"
+					stroke-linecap="round"
+					pointer-events="none"
+				/>
+				<text
+					v-if="collapsedIds.has(Number(bar.id))"
+					:x="getMilestoneCx(bar, milestone) - DUE_DIAMOND_SIZE - 4"
+					:y="DUE_DIAMOND_CY"
+					text-anchor="end"
+					dominant-baseline="middle"
+					class="gantt-milestone-label"
+				>{{ milestone.title }}</text>
+				<polygon
+					:points="getMilestonePoints(bar, milestone)"
+					:fill="milestone.done ? '#ff8c00' : 'var(--danger)'"
+					stroke="var(--white)"
+					stroke-width="1.5"
+					class="gantt-due-diamond"
+					role="button"
+					:aria-label="milestone.title"
+					@pointerdown.stop="startMilestoneDrag(bar, milestone, $event)"
+				>
+					<title>{{ milestone.title }}</title>
+				</polygon>
+			</g>
+
+			<!-- Ghost stem + diamond on hover -->
+			<g
+				v-if="hoveredDueDay?.barId === bar.id"
 				pointer-events="none"
 				opacity="0.5"
 			>
@@ -268,18 +281,19 @@
 			</g>
 		</GanttBarPrimitive>
 
-		<!-- Collapse/expand chevron for parent tasks — rendered after bars so it paints on top -->
+		<!-- Collapse/expand chevron for each parent task in this row -->
 		<g
-			v-if="isParent && bars[0]"
+			v-for="pbar in parentBars"
+			:key="'chev-' + pbar.id"
 			class="gantt-collapse-toggle"
-			:transform="`translate(${Math.max(0, getBarX(bars[0]) - 14)}, 24)`"
+			:transform="`translate(${Math.max(0, getBarX(pbar) - 14)}, 24)`"
 			role="button"
-			:aria-label="isCollapsed
-				? $t('project.gantt.expandGroup', { task: bars[0]?.meta?.label || '' })
-				: $t('project.gantt.collapseGroup', { task: bars[0]?.meta?.label || '' })"
+			:aria-label="collapsedIds.has(Number(pbar.id))
+				? $t('project.gantt.expandGroup', { task: pbar.meta?.label || '' })
+				: $t('project.gantt.collapseGroup', { task: pbar.meta?.label || '' })"
 			tabindex="0"
-			@pointerdown.stop="emit('toggleCollapse')"
-			@keydown.enter.stop="emit('toggleCollapse')"
+			@pointerdown.stop="emit('toggleCollapse', Number(pbar.id))"
+			@keydown.enter.stop="emit('toggleCollapse', Number(pbar.id))"
 		>
 			<rect
 				x="-2"
@@ -289,7 +303,7 @@
 				fill="transparent"
 			/>
 			<polygon
-				v-if="isCollapsed"
+				v-if="collapsedIds.has(Number(pbar.id))"
 				points="2,0 10,5 2,10"
 				fill="var(--grey-500)"
 			/>
@@ -324,7 +338,7 @@ const props = defineProps<{
 	dayWidthPixels: number
 	isDragging: boolean
 	isResizing: boolean
-	isDraggingDueDate: boolean
+	isDraggingMilestone: boolean
 	dragState: {
 		barId: string
 		startX: number
@@ -333,26 +347,26 @@ const props = defineProps<{
 		currentDays: number
 		edge?: 'start' | 'end'
 	} | null
-	dueDragState: {
+	milestoneDragState: {
 		barId: string
+		taskId: number
 		startX: number
-		originalDueDate: Date
+		originalDate: Date
 		currentDays: number
 	} | null
 	focusedRow: string | null
 	focusedCell: number | null
 	rowId: string
-	isParent: boolean
-	isCollapsed: boolean
+	collapsedIds: Set<number>
 }>()
 
 const emit = defineEmits<{
 	(e: 'barPointerDown', bar: GanttBarModel, event: PointerEvent): void
 	(e: 'startResize', bar: GanttBarModel, edge: 'start' | 'end', event: PointerEvent): void
-	(e: 'startDueDateDrag', bar: GanttBarModel, event: PointerEvent): void
-	(e: 'createDueDate', bar: GanttBarModel, dayIndex: number): void
+	(e: 'startMilestoneDrag', bar: GanttBarModel, milestone: {taskId: number, date: Date, title: string, done: boolean, dateField: 'dueDate' | 'endDate'}, event: PointerEvent): void
+	(e: 'createMilestone', bar: GanttBarModel, dayIndex: number, clientX: number, clientY: number): void
 	(e: 'updateTask', id: string, newStart: Date, newEnd: Date): void
-	(e: 'toggleCollapse'): void
+	(e: 'toggleCollapse', taskId: number): void
 }>()
 
 const {t} = useI18n({useScope: 'global'})
@@ -367,6 +381,8 @@ function addDays(dateOrValue: Date | string | number, days: number): Date {
 }
 
 const isRowFocused = computed(() => props.focusedRow === props.rowId)
+
+const parentBars = computed(() => props.bars.filter(b => b.meta?.isParent))
 
 function computeBarX(startDate: Date) {
 	const daysDiff = dayjs(startDate).diff(dayjs(props.dateFromDate), 'day')
@@ -527,26 +543,28 @@ function startResize(bar: GanttBarModel, edge: 'start' | 'end', event: PointerEv
 	emit('startResize', bar, edge, event)
 }
 
-function startDueDateDrag(bar: GanttBarModel, event: PointerEvent) {
-	emit('startDueDateDrag', bar, event)
+const DUE_DIAMOND_SIZE = 5
+const DUE_STEM_TOP = 56
+const DUE_STEM_BOTTOM = 61
+const DUE_DIAMOND_CY = 66
+
+function startMilestoneDrag(bar: GanttBarModel, milestone: {taskId: number, date: Date, title: string, done: boolean, dateField: 'dueDate' | 'endDate'}, event: PointerEvent) {
+	emit('startMilestoneDrag', bar, milestone, event)
 }
 
-const DUE_DIAMOND_SIZE = 5
-
-const getDueDiamondCenterX = computed(() => (bar: GanttBarModel): number | null => {
-	const dueDate = bar.meta?.dueDate
-	if (!dueDate) return null
-
-	let x = computeBarX(dueDate) + props.dayWidthPixels / 2
-
-	if (props.isDragging && props.dragState?.barId === bar.id) {
-		x += props.dragState.currentDays * props.dayWidthPixels
-	} else if (props.isDraggingDueDate && props.dueDragState?.barId === bar.id) {
-		x += props.dueDragState.currentDays * props.dayWidthPixels
+function getMilestoneCx(bar: GanttBarModel, milestone: {taskId: number, date: Date}): number {
+	let x = computeBarX(milestone.date) + props.dayWidthPixels / 2
+	if (props.isDraggingMilestone && props.milestoneDragState?.barId === bar.id && props.milestoneDragState.taskId === milestone.taskId) {
+		x += props.milestoneDragState.currentDays * props.dayWidthPixels
 	}
-
 	return x
-})
+}
+
+function getMilestonePoints(bar: GanttBarModel, milestone: {taskId: number, date: Date}): string {
+	const cx = getMilestoneCx(bar, milestone)
+	const s = DUE_DIAMOND_SIZE
+	return `${cx},${DUE_DIAMOND_CY - s} ${cx + s},${DUE_DIAMOND_CY} ${cx},${DUE_DIAMOND_CY + s} ${cx - s},${DUE_DIAMOND_CY}`
+}
 
 const hoveredDueDay = ref<{barId: string, day: number} | null>(null)
 
@@ -575,7 +593,7 @@ function onDueHoverClick(bar: GanttBarModel, event: MouseEvent) {
 	const day = computeDayFromEvent(event)
 	if (day === null) return
 	hoveredDueDay.value = null
-	emit('createDueDate', bar, day)
+	emit('createMilestone', bar, day, event.clientX, event.clientY)
 }
 
 function getGhostDiamondCenterX(bar: GanttBarModel): number | null {
@@ -586,16 +604,6 @@ function getGhostDiamondCenterX(bar: GanttBarModel): number | null {
 function getGhostDiamondPoints(bar: GanttBarModel): string {
 	const cx = getGhostDiamondCenterX(bar)
 	if (cx === null) return ''
-	const s = DUE_DIAMOND_SIZE
-	return `${cx},${DUE_DIAMOND_CY - s} ${cx + s},${DUE_DIAMOND_CY} ${cx},${DUE_DIAMOND_CY + s} ${cx - s},${DUE_DIAMOND_CY}`
-}
-
-const DUE_STEM_TOP = 56
-const DUE_STEM_BOTTOM = 61
-const DUE_DIAMOND_CY = 66
-
-function getDueDiamondPoints(bar: GanttBarModel): string {
-	const cx = getDueDiamondCenterX.value(bar) ?? 0
 	const s = DUE_DIAMOND_SIZE
 	return `${cx},${DUE_DIAMOND_CY - s} ${cx + s},${DUE_DIAMOND_CY} ${cx},${DUE_DIAMOND_CY + s} ${cx - s},${DUE_DIAMOND_CY}`
 }
@@ -738,6 +746,19 @@ function getTaskAssignees(bar: GanttBarModel): IUser[] {
 .gantt-parent-bar {
 	cursor: grab;
 	pointer-events: all;
+}
+
+.gantt-milestone-label {
+	font-size: 0.7rem;
+	fill: var(--grey-700);
+	pointer-events: none;
+	user-select: none;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.gantt-milestone-group:hover .gantt-milestone-label {
+	opacity: 1;
 }
 
 .gantt-due-diamond {

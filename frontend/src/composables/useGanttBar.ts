@@ -17,7 +17,7 @@ export interface GanttBarModel {
 		hasDerivedDates?: boolean
 		indentLevel?: number
 		bucketName?: string
-		dueDate?: Date
+		milestones?: Array<{taskId: number, date: Date, title: string, done: boolean, dateField: 'dueDate' | 'endDate'}>
 	}
 }
 export interface UseGanttBarOptions {

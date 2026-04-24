@@ -150,7 +150,7 @@
 									v-bind="DRAG_OPTIONS"
 									:handle="taskDragHandle"
 									:delay="isTouchDevice ? 300 : 1000"
-									:model-value="bucket.tasks"
+									:model-value="visibleTasksFor(bucket)"
 									:group="{name: 'tasks', put: shouldAcceptDrop(bucket) && !dragBucket}"
 									:disabled="!canWrite"
 									:data-bucket-index="bucketIndex"
@@ -529,6 +529,14 @@ function handleTaskContainerScroll(id: IBucket['id'], el: HTMLElement) {
 	)
 }
 
+function isSubtask(task: ITask): boolean {
+	return (task.relatedTasks?.parenttask?.length ?? 0) > 0
+}
+
+function visibleTasksFor(bucket: IBucket): ITask[] {
+	return bucket.tasks.filter(t => !isSubtask(t))
+}
+
 function updateTasks(bucketId: IBucket['id'], tasks: IBucket['tasks']) {
 	const bucket = kanbanStore.getBucketById(bucketId)
 
@@ -536,9 +544,12 @@ function updateTasks(bucketId: IBucket['id'], tasks: IBucket['tasks']) {
 		return
 	}
 
+	// Preserve hidden subtasks in the store; the draggable only sees visible tasks
+	const hiddenSubtasks = bucket.tasks.filter(isSubtask)
+
 	kanbanStore.setBucketById({
 		...bucket,
-		tasks,
+		tasks: [...tasks, ...hiddenSubtasks],
 	})
 }
 

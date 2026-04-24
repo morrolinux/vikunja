@@ -61,20 +61,19 @@
 										:day-width-pixels="DAY_WIDTH_PIXELS"
 										:is-dragging="isDragging"
 										:is-resizing="isResizing"
-										:is-dragging-due-date="isDraggingDueDate"
+										:is-dragging-milestone="isDraggingMilestone"
 										:drag-state="dragState"
-										:due-drag-state="dueDragState"
+										:milestone-drag-state="milestoneDragState"
 										:focused-row="focusedRow ?? null"
 										:focused-cell="focusedCell"
 										:row-id="rowId"
-										:is-parent="ganttBars[index]?.[0]?.meta?.isParent ?? false"
-										:is-collapsed="collapsedTaskIds.has(Number(ganttBars[index]?.[0]?.id))"
+										:collapsed-ids="collapsedTaskIds"
 										@barPointerDown="handleBarPointerDown"
 										@startResize="startResize"
-										@startDueDateDrag="startDueDateDrag"
-										@createDueDate="handleCreateDueDate"
+										@startMilestoneDrag="startMilestoneDrag"
+										@createMilestone="handleCreateMilestone"
 										@updateTask="updateGanttTask"
-										@toggleCollapse="toggleCollapse(Number(ganttBars[index]?.[0]?.id))"
+										@toggleCollapse="toggleCollapse($event)"
 									/>
 								</div>
 							</GanttRow>
@@ -90,11 +89,30 @@
 				</template>
 			</GanttChartBody>
 		</div>
+		<div
+			v-if="milestonePopup"
+			class="gantt-milestone-popup"
+			:style="{
+				top: `${milestonePopup.clientY + 8}px`,
+				left: `${milestonePopup.clientX}px`,
+			}"
+		>
+			<input
+				ref="milestoneInputRef"
+				v-model="milestonePopup.title"
+				class="input is-small"
+				type="text"
+				:placeholder="$t('project.gantt.newMilestonePlaceholder')"
+				@keydown.enter.prevent="submitMilestone"
+				@keydown.esc.prevent="cancelMilestone"
+				@blur="cancelMilestone"
+			>
+		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import {computed, ref, watch, toRefs, onUnmounted} from 'vue'
+import {computed, nextTick, ref, watch, toRefs, onUnmounted} from 'vue'
 import {useRouter} from 'vue-router'
 import dayjs from 'dayjs'
 import {useDayjsLanguageSync} from '@/i18n/useDayjsLanguageSync'
@@ -119,6 +137,7 @@ import Loading from '@/components/misc/Loading.vue'
 import {MILLISECONDS_A_DAY} from '@/constants/date'
 import {roundToNaturalDayBoundary} from '@/helpers/time/roundToNaturalDayBoundary'
 
+
 const props = defineProps<{
 	isLoading: boolean,
 	filters: GanttFilters,
@@ -130,6 +149,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:task', task: ITaskPartialWithId): void
+  (e: 'createSubtask', payload: {parentTaskId: number, title: string, dueDate: Date}): void
 }>()
 
 const DAY_WIDTH_PIXELS = 30
@@ -150,7 +170,7 @@ const router = useRouter()
 
 const isDragging = ref(false)
 const isResizing = ref(false)
-const isDraggingDueDate = ref(false)
+const isDraggingMilestone = ref(false)
 
 const currentFocusedRow = ref<string | null>(null)
 const currentFocusedCell = ref<number | null>(null)
@@ -164,12 +184,31 @@ const dragState = ref<{
 	edge?: 'start' | 'end'
 } | null>(null)
 
-const dueDragState = ref<{
+const milestoneDragState = ref<{
 	barId: string
+	taskId: number
 	startX: number
-	originalDueDate: Date
+	originalDate: Date
 	currentDays: number
+	dateField: 'dueDate' | 'endDate'
 } | null>(null)
+
+const milestonePopup = ref<{
+	parentTaskId: number
+	date: Date
+	clientX: number
+	clientY: number
+	title: string
+} | null>(null)
+
+const milestoneInputRef = ref<HTMLInputElement | null>(null)
+
+watch(milestonePopup, async (v) => {
+	if (v) {
+		await nextTick()
+		milestoneInputRef.value?.focus()
+	}
+})
 
 let dragMoveHandler: ((e: PointerEvent) => void) | null = null
 let dragStopHandler: (() => void) | null = null
@@ -200,7 +239,22 @@ const cellsByRow = ref<Record<string, string[]>>({})
 
 // Hierarchy state
 const collapsedTaskIds = ref(new Set<number>())
+const seenParentIds = ref(new Set<number>())
 const allNodes = ref<GanttTaskTreeNode[]>([])
+
+// Auto-collapse newly discovered parent tasks so subtasks are hidden by default
+watch(allNodes, (nodes) => {
+	let changed = false
+	const nextCollapsed = new Set(collapsedTaskIds.value)
+	for (const node of nodes) {
+		if (node.isParent && !seenParentIds.value.has(node.task.id)) {
+			seenParentIds.value.add(node.task.id)
+			nextCollapsed.add(node.task.id)
+			changed = true
+		}
+	}
+	if (changed) collapsedTaskIds.value = nextCollapsed
+}, {immediate: true})
 
 const visibleNodes = computed(() => {
 	const result: GanttTaskTreeNode[] = []
@@ -264,6 +318,61 @@ function getRoundedDate(value: string | Date | undefined, fallback: Date | strin
 	return roundToNaturalDayBoundary(value ? new Date(value) : new Date(fallback), isStart)
 }
 
+function shiftDescendantsDates(parentTaskId: number, days: number, visited: Set<number> = new Set()) {
+	if (visited.has(parentTaskId)) return
+	visited.add(parentTaskId)
+	const parent = tasks.value.get(parentTaskId)
+	if (!parent) return
+	const subtasks = parent.relatedTasks?.subtask ?? []
+	for (const sub of subtasks) {
+		const full = tasks.value.get(sub.id)
+		if (!full) continue
+		const update: ITaskPartialWithId = {id: full.id}
+		let hasChange = false
+		if (full.startDate) {
+			const d = new Date(full.startDate)
+			d.setDate(d.getDate() + days)
+			update.startDate = d
+			hasChange = true
+		}
+		if (full.endDate) {
+			const d = new Date(full.endDate)
+			d.setDate(d.getDate() + days)
+			update.endDate = d
+			hasChange = true
+		}
+		if (full.dueDate) {
+			const d = new Date(full.dueDate)
+			d.setDate(d.getDate() + days)
+			update.dueDate = d
+			hasChange = true
+		}
+		if (hasChange) {
+			emit('update:task', update)
+		}
+		shiftDescendantsDates(full.id, days, visited)
+	}
+}
+
+function collectMilestones(node: GanttTaskTreeNode): Array<{taskId: number, date: Date, title: string, done: boolean, dateField: 'dueDate' | 'endDate'}> {
+	const milestones: Array<{taskId: number, date: Date, title: string, done: boolean, dateField: 'dueDate' | 'endDate'}> = []
+	for (const childId of node.childIds) {
+		const child = tasks.value.get(childId)
+		if (!child) continue
+		const dateField: 'dueDate' | 'endDate' = child.dueDate ? 'dueDate' : 'endDate'
+		const value = child[dateField]
+		if (!value) continue
+		milestones.push({
+			taskId: child.id,
+			date: new Date(value),
+			title: child.title,
+			done: Boolean(child.done),
+			dateField,
+		})
+	}
+	return milestones
+}
+
 function transformTaskToGanttBar(node: GanttTaskTreeNode): GanttBarModel {
 	const t = node.task
 	const DEFAULT_SPAN_DAYS = 7
@@ -315,7 +424,7 @@ function transformTaskToGanttBar(node: GanttTaskTreeNode): GanttBarModel {
 			hasDerivedDates: node.hasDerivedDates,
 			indentLevel: node.indentLevel,
 			bucketName: findBucketNameForTask(t),
-			dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
+			milestones: collectMilestones(node),
 		},
 	}
 }
@@ -340,6 +449,52 @@ function packBarsIntoRows(bars: GanttBarModel[]): GanttBarModel[][] {
 		}
 	}
 	return rows
+}
+
+function findRootAncestorId(taskId: number): number {
+	const task = tasks.value.get(taskId)
+	if (!task) return taskId
+	const parents = task.relatedTasks?.parenttask ?? []
+	const parentInView = parents.find(p => tasks.value.has(p.id))
+	if (!parentInView) return taskId
+	return findRootAncestorId(parentInView.id)
+}
+
+/**
+ * Packs top-level bars into rows (compact), but keeps each subtree's subtasks
+ * on dedicated rows immediately after the row containing their root ancestor.
+ */
+function packBarsWithSubtaskGrouping(bars: GanttBarModel[]): GanttBarModel[][] {
+	const groupMap = new Map<number, GanttBarModel[]>()
+	const rootOrder: number[] = []
+	for (const bar of bars) {
+		const rootId = findRootAncestorId(Number(bar.id))
+		if (!groupMap.has(rootId)) {
+			groupMap.set(rootId, [])
+			rootOrder.push(rootId)
+		}
+		groupMap.get(rootId)!.push(bar)
+	}
+
+	// Anchor bar for each group — the first visible bar in tree order (typically the root)
+	const anchorBars = rootOrder.map(rootId => groupMap.get(rootId)![0])
+	const packedAnchorRows = packBarsIntoRows(anchorBars)
+
+	const result: GanttBarModel[][] = []
+	for (const row of packedAnchorRows) {
+		result.push(row)
+		const rootIdsInRow = new Set(row.map(b => findRootAncestorId(Number(b.id))))
+		for (const rootId of rootOrder) {
+			if (!rootIdsInRow.has(rootId)) continue
+			const group = groupMap.get(rootId)!
+			// Skip the anchor (index 0) which is already in the packed row
+			const subBars = group.slice(1)
+			if (subBars.length === 0) continue
+			const packedSubs = packBarsIntoRows(subBars)
+			result.push(...packedSubs)
+		}
+	}
+	return result
 }
 
 // Build the task tree when tasks change
@@ -373,7 +528,7 @@ watch(
 		})
 
 		if (compactView.value) {
-			ganttBars.value = packBarsIntoRows(bars)
+			ganttBars.value = packBarsWithSubtaskGrouping(bars)
 		} else {
 			ganttBars.value = bars.map(bar => [bar])
 		}
@@ -665,6 +820,7 @@ function startDrag(bar: GanttBarModel, event: PointerEvent) {
 			newEnd.setDate(newEnd.getDate() + days)
 
 			updateGanttTask(bar.id, newStart, newEnd, days)
+			shiftDescendantsDates(Number(bar.id), days)
 		}
 		
 		isDragging.value = false
@@ -762,40 +918,59 @@ function startResize(bar: GanttBarModel, edge: 'start' | 'end', event: PointerEv
 	document.addEventListener('pointerup', handleStop)
 }
 
-function handleCreateDueDate(bar: GanttBarModel, dayIndex: number) {
-	const newDueDate = new Date(dateFromDate.value)
-	newDueDate.setDate(newDueDate.getDate() + dayIndex)
-	emit('update:task', {
-		id: Number(bar.id),
-		dueDate: roundToNaturalDayBoundary(newDueDate),
+function handleCreateMilestone(bar: GanttBarModel, dayIndex: number, clientX: number, clientY: number) {
+	const date = new Date(dateFromDate.value)
+	date.setDate(date.getDate() + dayIndex)
+	milestonePopup.value = {
+		parentTaskId: Number(bar.id),
+		date,
+		clientX,
+		clientY,
+		title: '',
+	}
+}
+
+function submitMilestone() {
+	if (!milestonePopup.value || milestonePopup.value.title.trim() === '') return
+	const {parentTaskId, date, title} = milestonePopup.value
+	milestonePopup.value = null
+	const dueDate = new Date(date)
+	dueDate.setHours(23, 59, 59, 999)
+	emit('createSubtask', {
+		parentTaskId,
+		title: title.trim(),
+		dueDate,
 	})
 }
 
-function startDueDateDrag(bar: GanttBarModel, event: PointerEvent) {
+function cancelMilestone() {
+	milestonePopup.value = null
+}
+
+function startMilestoneDrag(bar: GanttBarModel, milestone: {taskId: number, date: Date, title: string, done: boolean, dateField: 'dueDate' | 'endDate'}, event: PointerEvent) {
 	event.preventDefault()
 	event.stopPropagation()
 
-	const originalDueDate = bar.meta?.dueDate
-	if (!originalDueDate) return
-
-	isDraggingDueDate.value = true
-	dueDragState.value = {
+	isDraggingMilestone.value = true
+	milestoneDragState.value = {
 		barId: bar.id,
+		taskId: milestone.taskId,
 		startX: event.clientX,
-		originalDueDate: new Date(originalDueDate),
+		originalDate: new Date(milestone.date),
 		currentDays: 0,
+		dateField: milestone.dateField,
 	}
 
 	setCursor('grabbing')
 
 	const handleMove = (e: PointerEvent) => {
-		if (!dueDragState.value || !isDraggingDueDate.value) return
+		if (!milestoneDragState.value || !isDraggingMilestone.value) return
 
-		const diff = e.clientX - dueDragState.value.startX
+		const diff = e.clientX - milestoneDragState.value.startX
 		const days = Math.round(diff / DAY_WIDTH_PIXELS)
 
-		if (days !== dueDragState.value.currentDays) {
-			dueDragState.value.currentDays = days
+		if (days !== milestoneDragState.value.currentDays) {
+			milestoneDragState.value.currentDays = days
 		}
 	}
 
@@ -811,17 +986,17 @@ function startDueDateDrag(bar: GanttBarModel, event: PointerEvent) {
 
 		clearCursor()
 
-		if (dueDragState.value && dueDragState.value.currentDays !== 0) {
-			const newDueDate = new Date(dueDragState.value.originalDueDate)
-			newDueDate.setDate(newDueDate.getDate() + dueDragState.value.currentDays)
+		if (milestoneDragState.value && milestoneDragState.value.currentDays !== 0) {
+			const newDate = new Date(milestoneDragState.value.originalDate)
+			newDate.setDate(newDate.getDate() + milestoneDragState.value.currentDays)
 			emit('update:task', {
-				id: Number(bar.id),
-				dueDate: roundToNaturalDayBoundary(newDueDate),
+				id: milestoneDragState.value.taskId,
+				[milestoneDragState.value.dateField]: roundToNaturalDayBoundary(newDate),
 			})
 		}
 
-		isDraggingDueDate.value = false
-		dueDragState.value = null
+		isDraggingMilestone.value = false
+		milestoneDragState.value = null
 	}
 
 	dragMoveHandler = handleMove
@@ -870,6 +1045,20 @@ onUnmounted(() => {
 .gantt-container {
 	overflow-x: auto;
 	min-inline-size: 100%;
+}
+
+.gantt-milestone-popup {
+	position: fixed;
+	z-index: 4700;
+	background: var(--white);
+	border: 1px solid var(--grey-300);
+	border-radius: 4px;
+	padding: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+	.input {
+		min-inline-size: 200px;
+	}
 }
 
 .gantt-chart-wrapper {

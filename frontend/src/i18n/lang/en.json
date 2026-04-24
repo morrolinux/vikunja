@@ -459,6 +459,7 @@
       "resizeStartDate": "Resize start date for task {task}",
       "resizeEndDate": "Resize end date for task {task}",
       "dueDateMarker": "Due date marker for task {task}. Drag to change due date.",
+      "newMilestonePlaceholder": "Milestone title…",
       "timelineHeader": "Timeline header with months and days",
       "monthsRow": "Months row",
       "daysRow": "Days row",

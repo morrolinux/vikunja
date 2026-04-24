@@ -61,6 +61,7 @@
 						:default-task-end-date="defaultTaskEndDate"
 						:compact-view="compactView"
 						@update:task="updateTask"
+						@createSubtask="handleCreateSubtask"
 					/>
 					<TaskForm
 						v-if="canWrite"
@@ -91,6 +92,12 @@ import GanttChart from '@/components/gantt/GanttChart.vue'
 import {useGanttFilters} from '../../../views/project/helpers/useGanttFilters'
 import {PERMISSIONS} from '@/constants/permissions'
 
+import TaskService from '@/services/task'
+import TaskModel from '@/models/task'
+import TaskRelationService from '@/services/taskRelation'
+import TaskRelationModel from '@/models/taskRelation'
+import {RELATION_KIND} from '@/types/IRelationKind'
+
 import type {DateISO} from '@/types/DateISO'
 import type {ITask} from '@/modelTypes/ITask'
 import type {IProjectView} from '@/modelTypes/IProjectView'
@@ -116,6 +123,7 @@ const {
 	isLoading,
 	addTask,
 	updateTask,
+	loadTasks,
 } = useGanttFilters(route, viewId)
 
 const compactView = ref(true)
@@ -137,6 +145,27 @@ async function addGanttTask(title: ITask['title']) {
 		startDate: defaultTaskStartDate,
 		endDate: defaultTaskEndDate,
 	})
+}
+
+async function handleCreateSubtask(payload: {parentTaskId: number, title: string, dueDate: Date}) {
+	const parent = tasks.value.get(payload.parentTaskId)
+	if (!parent) return
+
+	const taskService = new TaskService()
+	const newTask = await taskService.create(new TaskModel({
+		title: payload.title,
+		projectId: parent.projectId,
+		dueDate: payload.dueDate,
+	}))
+
+	const relationService = new TaskRelationService()
+	await relationService.create(new TaskRelationModel({
+		taskId: newTask.id,
+		otherTaskId: payload.parentTaskId,
+		relationKind: RELATION_KIND.PARENTTASK,
+	}))
+
+	await loadTasks()
 }
 
 const flatPickerEl = ref<typeof Foo | null>(null)

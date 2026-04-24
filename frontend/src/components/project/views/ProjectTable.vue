@@ -193,7 +193,7 @@
 							</thead>
 							<tbody>
 								<tr
-									v-for="t in tasks"
+									v-for="t in visibleTasks"
 									:key="t.id"
 								>
 									<td v-if="activeColumns.index">
@@ -376,6 +376,10 @@ const {
 	sortByParam,
 } = taskList
 const tasks: Ref<ITask[]> = taskList.tasks
+
+const visibleTasks = computed(() =>
+	tasks.value.filter(t => !((t.relatedTasks?.parenttask?.length ?? 0) > 0)),
+)
 
 watch(
 	() => activeColumns.value,
