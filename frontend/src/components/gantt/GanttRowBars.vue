@@ -2,7 +2,7 @@
 	<svg
 		class="gantt-row-bars"
 		:width="totalWidth"
-		height="60"
+		height="72"
 		xmlns="http://www.w3.org/2000/svg"
 		role="img"
 		:aria-label="$t('project.gantt.taskBarsForRow', { rowId })"
@@ -205,6 +205,67 @@
 					</span>
 				</div>
 			</foreignObject>
+
+			<!-- Due date marker stem + diamond (draggable) -->
+			<g v-if="bar.meta?.dueDate">
+				<line
+					:x1="getDueDiamondCenterX(bar) ?? 0"
+					:x2="getDueDiamondCenterX(bar) ?? 0"
+					:y1="DUE_STEM_TOP"
+					:y2="DUE_STEM_BOTTOM"
+					stroke="var(--grey-500)"
+					stroke-width="2"
+					stroke-linecap="round"
+					pointer-events="none"
+				/>
+				<polygon
+					:points="getDueDiamondPoints(bar)"
+					fill="var(--danger)"
+					stroke="var(--white)"
+					stroke-width="1.5"
+					class="gantt-due-diamond"
+					role="button"
+					:aria-label="$t('project.gantt.dueDateMarker', { task: bar.meta?.label || bar.id })"
+					@pointerdown.stop="startDueDateDrag(bar, $event)"
+				/>
+			</g>
+
+			<!-- Hover zone to create a due date (only for bars without one) -->
+			<rect
+				v-if="!bar.meta?.dueDate"
+				:x="getBarX(bar)"
+				:y="56"
+				:width="getBarWidth(bar)"
+				:height="16"
+				fill="transparent"
+				class="gantt-due-hover-zone"
+				@pointermove="onDueHoverMove(bar, $event)"
+				@pointerleave="onDueHoverLeave(bar)"
+				@click.stop="onDueHoverClick(bar, $event)"
+			/>
+
+			<!-- Ghost stem + diamond on hover (for bars without a due date) -->
+			<g
+				v-if="!bar.meta?.dueDate && hoveredDueDay?.barId === bar.id"
+				pointer-events="none"
+				opacity="0.5"
+			>
+				<line
+					:x1="getGhostDiamondCenterX(bar) ?? 0"
+					:x2="getGhostDiamondCenterX(bar) ?? 0"
+					:y1="DUE_STEM_TOP"
+					:y2="DUE_STEM_BOTTOM"
+					stroke="var(--grey-500)"
+					stroke-width="2"
+					stroke-linecap="round"
+				/>
+				<polygon
+					:points="getGhostDiamondPoints(bar)"
+					fill="var(--danger)"
+					stroke="var(--white)"
+					stroke-width="1.5"
+				/>
+			</g>
 		</GanttBarPrimitive>
 
 		<!-- Collapse/expand chevron for parent tasks — rendered after bars so it paints on top -->
@@ -242,7 +303,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue'
+import {computed, ref} from 'vue'
 import dayjs from 'dayjs'
 import {useI18n} from 'vue-i18n'
 
@@ -263,6 +324,7 @@ const props = defineProps<{
 	dayWidthPixels: number
 	isDragging: boolean
 	isResizing: boolean
+	isDraggingDueDate: boolean
 	dragState: {
 		barId: string
 		startX: number
@@ -270,6 +332,12 @@ const props = defineProps<{
 		originalEnd: Date
 		currentDays: number
 		edge?: 'start' | 'end'
+	} | null
+	dueDragState: {
+		barId: string
+		startX: number
+		originalDueDate: Date
+		currentDays: number
 	} | null
 	focusedRow: string | null
 	focusedCell: number | null
@@ -281,6 +349,8 @@ const props = defineProps<{
 const emit = defineEmits<{
 	(e: 'barPointerDown', bar: GanttBarModel, event: PointerEvent): void
 	(e: 'startResize', bar: GanttBarModel, edge: 'start' | 'end', event: PointerEvent): void
+	(e: 'startDueDateDrag', bar: GanttBarModel, event: PointerEvent): void
+	(e: 'createDueDate', bar: GanttBarModel, dayIndex: number): void
 	(e: 'updateTask', id: string, newStart: Date, newEnd: Date): void
 	(e: 'toggleCollapse'): void
 }>()
@@ -457,6 +527,79 @@ function startResize(bar: GanttBarModel, edge: 'start' | 'end', event: PointerEv
 	emit('startResize', bar, edge, event)
 }
 
+function startDueDateDrag(bar: GanttBarModel, event: PointerEvent) {
+	emit('startDueDateDrag', bar, event)
+}
+
+const DUE_DIAMOND_SIZE = 5
+
+const getDueDiamondCenterX = computed(() => (bar: GanttBarModel): number | null => {
+	const dueDate = bar.meta?.dueDate
+	if (!dueDate) return null
+
+	let x = computeBarX(dueDate) + props.dayWidthPixels / 2
+
+	if (props.isDragging && props.dragState?.barId === bar.id) {
+		x += props.dragState.currentDays * props.dayWidthPixels
+	} else if (props.isDraggingDueDate && props.dueDragState?.barId === bar.id) {
+		x += props.dueDragState.currentDays * props.dayWidthPixels
+	}
+
+	return x
+})
+
+const hoveredDueDay = ref<{barId: string, day: number} | null>(null)
+
+function computeDayFromEvent(event: PointerEvent | MouseEvent): number | null {
+	const svg = (event.currentTarget as Element)?.closest('svg')
+	if (!svg) return null
+	const rect = svg.getBoundingClientRect()
+	const x = event.clientX - rect.left
+	return Math.floor(x / props.dayWidthPixels)
+}
+
+function onDueHoverMove(bar: GanttBarModel, event: PointerEvent) {
+	const day = computeDayFromEvent(event)
+	if (day === null) return
+	if (hoveredDueDay.value?.barId === bar.id && hoveredDueDay.value.day === day) return
+	hoveredDueDay.value = {barId: bar.id, day}
+}
+
+function onDueHoverLeave(bar: GanttBarModel) {
+	if (hoveredDueDay.value?.barId === bar.id) {
+		hoveredDueDay.value = null
+	}
+}
+
+function onDueHoverClick(bar: GanttBarModel, event: MouseEvent) {
+	const day = computeDayFromEvent(event)
+	if (day === null) return
+	hoveredDueDay.value = null
+	emit('createDueDate', bar, day)
+}
+
+function getGhostDiamondCenterX(bar: GanttBarModel): number | null {
+	if (!hoveredDueDay.value || hoveredDueDay.value.barId !== bar.id) return null
+	return hoveredDueDay.value.day * props.dayWidthPixels + props.dayWidthPixels / 2
+}
+
+function getGhostDiamondPoints(bar: GanttBarModel): string {
+	const cx = getGhostDiamondCenterX(bar)
+	if (cx === null) return ''
+	const s = DUE_DIAMOND_SIZE
+	return `${cx},${DUE_DIAMOND_CY - s} ${cx + s},${DUE_DIAMOND_CY} ${cx},${DUE_DIAMOND_CY + s} ${cx - s},${DUE_DIAMOND_CY}`
+}
+
+const DUE_STEM_TOP = 56
+const DUE_STEM_BOTTOM = 61
+const DUE_DIAMOND_CY = 66
+
+function getDueDiamondPoints(bar: GanttBarModel): string {
+	const cx = getDueDiamondCenterX.value(bar) ?? 0
+	const s = DUE_DIAMOND_SIZE
+	return `${cx},${DUE_DIAMOND_CY - s} ${cx + s},${DUE_DIAMOND_CY} ${cx},${DUE_DIAMOND_CY + s} ${cx - s},${DUE_DIAMOND_CY}`
+}
+
 function getBarPercentDone(bar: GanttBarModel): number {
 	const task = bar.meta?.task as {percentDone?: number} | undefined
 	return task?.percentDone ?? 0
@@ -594,6 +737,24 @@ function getTaskAssignees(bar: GanttBarModel): IUser[] {
 
 .gantt-parent-bar {
 	cursor: grab;
+	pointer-events: all;
+}
+
+.gantt-due-diamond {
+	cursor: grab;
+	pointer-events: all;
+
+	&:hover {
+		filter: brightness(1.1);
+	}
+
+	&:active {
+		cursor: grabbing;
+	}
+}
+
+.gantt-due-hover-zone {
+	cursor: crosshair;
 	pointer-events: all;
 }
 

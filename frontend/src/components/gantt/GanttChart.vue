@@ -61,7 +61,9 @@
 										:day-width-pixels="DAY_WIDTH_PIXELS"
 										:is-dragging="isDragging"
 										:is-resizing="isResizing"
+										:is-dragging-due-date="isDraggingDueDate"
 										:drag-state="dragState"
+										:due-drag-state="dueDragState"
 										:focused-row="focusedRow ?? null"
 										:focused-cell="focusedCell"
 										:row-id="rowId"
@@ -69,6 +71,8 @@
 										:is-collapsed="collapsedTaskIds.has(Number(ganttBars[index]?.[0]?.id))"
 										@barPointerDown="handleBarPointerDown"
 										@startResize="startResize"
+										@startDueDateDrag="startDueDateDrag"
+										@createDueDate="handleCreateDueDate"
 										@updateTask="updateGanttTask"
 										@toggleCollapse="toggleCollapse(Number(ganttBars[index]?.[0]?.id))"
 									/>
@@ -146,6 +150,7 @@ const router = useRouter()
 
 const isDragging = ref(false)
 const isResizing = ref(false)
+const isDraggingDueDate = ref(false)
 
 const currentFocusedRow = ref<string | null>(null)
 const currentFocusedCell = ref<number | null>(null)
@@ -157,6 +162,13 @@ const dragState = ref<{
 	originalEnd: Date
 	currentDays: number
 	edge?: 'start' | 'end'
+} | null>(null)
+
+const dueDragState = ref<{
+	barId: string
+	startX: number
+	originalDueDate: Date
+	currentDays: number
 } | null>(null)
 
 let dragMoveHandler: ((e: PointerEvent) => void) | null = null
@@ -303,6 +315,7 @@ function transformTaskToGanttBar(node: GanttTaskTreeNode): GanttBarModel {
 			hasDerivedDates: node.hasDerivedDates,
 			indentLevel: node.indentLevel,
 			bucketName: findBucketNameForTask(t),
+			dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
 		},
 	}
 }
@@ -374,7 +387,7 @@ watch(
 )
 
 // Compute bar positions for arrow rendering
-const ROW_HEIGHT = 60
+const ROW_HEIGHT = 72
 
 const barPositions = computed(() => {
 	const positions = new Map<number, GanttBarPosition>()
@@ -386,7 +399,7 @@ const barPositions = computed(() => {
 			const taskId = Number(bar.id)
 			let x = computeBarX(bar.start)
 			let width = computeBarWidth(bar)
-			const y = rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2
+			const y = rowIndex * ROW_HEIGHT + 30
 
 			// Apply drag/resize offset for the active bar
 			if (ds && bar.id === ds.barId && dragPixelOffset !== 0) {
@@ -483,7 +496,7 @@ const parentGroupBands = computed(() => {
 	return bands
 })
 
-function updateGanttTask(id: string, newStart: Date, newEnd: Date) {
+function updateGanttTask(id: string, newStart: Date, newEnd: Date, shiftDueDateDays?: number) {
 	const task = tasks.value.get(Number(id))
 	if (!task) return
 
@@ -518,6 +531,13 @@ function updateGanttTask(id: string, newStart: Date, newEnd: Date) {
 		// No dates at all — update both (existing behavior for dateless tasks)
 		update.startDate = roundToNaturalDayBoundary(newStart, true)
 		update.endDate = roundToNaturalDayBoundary(newEnd)
+	}
+
+	// Full-bar drag: shift dueDate alongside the bar
+	if (shiftDueDateDays !== undefined && shiftDueDateDays !== 0 && hasDueDate && task.dueDate) {
+		const newDue = new Date(task.dueDate)
+		newDue.setDate(newDue.getDate() + shiftDueDateDays)
+		update.dueDate = roundToNaturalDayBoundary(newDue)
 	}
 
 	emit('update:task', update)
@@ -638,12 +658,13 @@ function startDrag(bar: GanttBarModel, event: PointerEvent) {
 		clearCursor(barElement)
 		
 		if (dragState.value && dragState.value.currentDays !== 0) {
+			const days = dragState.value.currentDays
 			const newStart = new Date(dragState.value.originalStart)
-			newStart.setDate(newStart.getDate() + dragState.value.currentDays)
+			newStart.setDate(newStart.getDate() + days)
 			const newEnd = new Date(dragState.value.originalEnd)
-			newEnd.setDate(newEnd.getDate() + dragState.value.currentDays)
-			
-			updateGanttTask(bar.id, newStart, newEnd)
+			newEnd.setDate(newEnd.getDate() + days)
+
+			updateGanttTask(bar.id, newStart, newEnd, days)
 		}
 		
 		isDragging.value = false
@@ -741,6 +762,75 @@ function startResize(bar: GanttBarModel, edge: 'start' | 'end', event: PointerEv
 	document.addEventListener('pointerup', handleStop)
 }
 
+function handleCreateDueDate(bar: GanttBarModel, dayIndex: number) {
+	const newDueDate = new Date(dateFromDate.value)
+	newDueDate.setDate(newDueDate.getDate() + dayIndex)
+	emit('update:task', {
+		id: Number(bar.id),
+		dueDate: roundToNaturalDayBoundary(newDueDate),
+	})
+}
+
+function startDueDateDrag(bar: GanttBarModel, event: PointerEvent) {
+	event.preventDefault()
+	event.stopPropagation()
+
+	const originalDueDate = bar.meta?.dueDate
+	if (!originalDueDate) return
+
+	isDraggingDueDate.value = true
+	dueDragState.value = {
+		barId: bar.id,
+		startX: event.clientX,
+		originalDueDate: new Date(originalDueDate),
+		currentDays: 0,
+	}
+
+	setCursor('grabbing')
+
+	const handleMove = (e: PointerEvent) => {
+		if (!dueDragState.value || !isDraggingDueDate.value) return
+
+		const diff = e.clientX - dueDragState.value.startX
+		const days = Math.round(diff / DAY_WIDTH_PIXELS)
+
+		if (days !== dueDragState.value.currentDays) {
+			dueDragState.value.currentDays = days
+		}
+	}
+
+	const handleStop = () => {
+		if (dragMoveHandler) {
+			document.removeEventListener('pointermove', dragMoveHandler)
+			dragMoveHandler = null
+		}
+		if (dragStopHandler) {
+			document.removeEventListener('pointerup', dragStopHandler)
+			dragStopHandler = null
+		}
+
+		clearCursor()
+
+		if (dueDragState.value && dueDragState.value.currentDays !== 0) {
+			const newDueDate = new Date(dueDragState.value.originalDueDate)
+			newDueDate.setDate(newDueDate.getDate() + dueDragState.value.currentDays)
+			emit('update:task', {
+				id: Number(bar.id),
+				dueDate: roundToNaturalDayBoundary(newDueDate),
+			})
+		}
+
+		isDraggingDueDate.value = false
+		dueDragState.value = null
+	}
+
+	dragMoveHandler = handleMove
+	dragStopHandler = handleStop
+
+	document.addEventListener('pointermove', handleMove)
+	document.addEventListener('pointerup', handleStop)
+}
+
 function handleFocusChange(payload: { row: string | null; cell: number | null }) {
 	currentFocusedRow.value = payload.row
 	currentFocusedCell.value = payload.cell
@@ -808,7 +898,7 @@ onUnmounted(() => {
 
 .gantt-row-content {
 	position: relative;
-	min-block-size: 60px;
+	min-block-size: 72px;
 	inline-size: 100%;
 }
 </style>
