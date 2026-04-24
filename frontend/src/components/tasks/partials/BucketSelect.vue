@@ -46,6 +46,7 @@ import {PROJECT_VIEW_KINDS} from '@/modelTypes/IProjectView'
 import {useProjectStore} from '@/stores/projects'
 import {useKanbanStore} from '@/stores/kanban'
 import {useBaseStore} from '@/stores/base'
+import {useTaskStore} from '@/stores/tasks'
 
 import BaseButton from '@/components/base/BaseButton.vue'
 import Dropdown from '@/components/misc/Dropdown.vue'
@@ -71,6 +72,7 @@ const {t} = useI18n({useScope: 'global'})
 const projectStore = useProjectStore()
 const kanbanStore = useKanbanStore()
 const baseStore = useBaseStore()
+const taskStore = useTaskStore()
 
 const project = computed(() => projectStore.projects[props.task.projectId])
 
@@ -169,7 +171,15 @@ async function changeBucket(bucket: IBucket) {
 		bucketId: bucket.id,
 	}
 
-	emit('update:task', updatedTask)
+	// Update percentDone based on bucket position, matching Kanban drag behavior
+	const bucketIndex = buckets.value.findIndex(b => b.id === bucket.id)
+	if (bucketIndex !== -1 && buckets.value.length > 1) {
+		updatedTask.percentDone = bucketIndex / (buckets.value.length - 1)
+		const persisted = await taskStore.update(updatedTask)
+		emit('update:task', persisted)
+	} else {
+		emit('update:task', updatedTask)
+	}
 
 	success({message: t('task.detail.bucketChangedSuccess')})
 }
