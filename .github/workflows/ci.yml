@@ -27,7 +27,7 @@ jobs:
     secrets: inherit
 
   release:
-    name: Release
+    if: ${{ github.repository == 'go-vikunja/vikunja' && (github.ref_type == 'tag' || github.ref_name == 'main') }}
     if: ${{ github.ref_type == 'tag' || github.ref_name == 'main' }}
     uses: ./.github/workflows/release.yml
     # Called workflows can only narrow these, never widen them.
