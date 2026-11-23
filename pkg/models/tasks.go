@@ -448,6 +448,9 @@ func lockTaskForRead(s *xorm.Session, a web.Auth, taskID int64) (task Task, err 
 	if !can {
 		return Task{}, ErrGenericForbidden{}
 	}
+	if err := (&Project{ID: task.ProjectID}).CheckIsArchived(s); err != nil {
+		return Task{}, err
+	}
 	return task, nil
 }
 

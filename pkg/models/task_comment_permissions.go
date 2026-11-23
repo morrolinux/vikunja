@@ -30,8 +30,7 @@ func (tc *TaskComment) CanRead(s *xorm.Session, a web.Auth) (bool, int, error) {
 func (tc *TaskComment) canUserModifyTaskComment(s *xorm.Session, a web.Auth) (bool, error) {
 	// Fork: read access to the task is enough to modify one's own comments,
 	// so read-only users can take part in discussions.
-	t := Task{ID: tc.TaskID}
-	canReadTask, _, err := t.CanRead(s, a)
+	canReadTask, err := canInteractWithTask(s, a, tc.TaskID)
 	if err != nil {
 		return false, err
 	}
@@ -64,7 +63,19 @@ func (tc *TaskComment) CanUpdate(s *xorm.Session, a web.Auth) (bool, error) {
 // CanCreate checks if a user can create a new comment.
 // Fork: read access to the task is enough to leave a comment.
 func (tc *TaskComment) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
-	t := Task{ID: tc.TaskID}
+	return canInteractWithTask(s, a, tc.TaskID)
+}
+
+// canInteractWithTask checks whether a user may comment on or react to a task.
+// Fork: read access is enough, but archived projects stay read-only for everyone.
+func canInteractWithTask(s *xorm.Session, a web.Auth, taskID int64) (bool, error) {
+	t := Task{ID: taskID}
 	can, _, err := t.CanRead(s, a)
-	return can, err
+	if err != nil || !can {
+		return false, err
+	}
+	if err := (&Project{ID: t.ProjectID}).CheckIsArchived(s); err != nil {
+		return false, err
+	}
+	return true, nil
 }
