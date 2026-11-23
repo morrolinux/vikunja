@@ -42,7 +42,7 @@
 
 <script lang="ts" setup>
 import {bucketsQuery} from '@/client/queries/kanban'
-import {useMoveTaskMutation} from '@/client/queries/taskMutations'
+import {useMoveTaskMutation, useUpdateTaskMutation} from '@/client/queries/taskMutations'
 import {useQuery} from '@tanstack/vue-query'
 import {computed} from 'vue'
 import {useI18n} from 'vue-i18n'
@@ -72,6 +72,7 @@ const {t} = useI18n({useScope: 'global'})
 
 const projectList = useProjects()
 const moveMutation = useMoveTaskMutation()
+const updateTaskMutation = useUpdateTaskMutation()
 const baseStore = useBaseStore()
 
 const project = computed(() => projectList.projects[props.task.project_id ?? 0])
@@ -125,6 +126,15 @@ async function changeBucket(bucket: IBucket) {
 		bucket: bucket.id!,
 		task: props.task,
 	})
+
+	// Update percent_done based on bucket position, matching Kanban drag behavior
+	const bucketIndex = buckets.value.findIndex(b => b.id === bucket.id)
+	if (bucketIndex !== -1 && buckets.value.length > 1) {
+		await updateTaskMutation.mutateAsync({
+			id: props.task.id!,
+			percent_done: bucketIndex / (buckets.value.length - 1),
+		})
+	}
 
 	success({message: t('task.detail.bucketChangedSuccess')})
 }

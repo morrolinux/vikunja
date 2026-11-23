@@ -40,6 +40,12 @@
 					>
 						{{ $t('task.show.noDates') }}
 					</FancyCheckbox>
+					<FancyCheckbox
+						v-model="compactView"
+						is-block
+					>
+						{{ $t('project.gantt.compactView') }}
+					</FancyCheckbox>
 				</div>
 			</Card>
 
@@ -55,6 +61,7 @@
 						:is-loading="isLoading"
 						:default-task-start-date="defaultTaskStartDate"
 						:default-task-end-date="defaultTaskEndDate"
+						:compact-view="compactView"
 						@update:task="updateTask"
 					/>
 					<TaskForm
@@ -68,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, toRefs} from 'vue'
+import {computed, ref, toRefs} from 'vue'
 import type {RouteLocationNormalized} from 'vue-router'
 
 import {useCurrentProject} from '@/composables/useCurrentProject'
@@ -110,6 +117,8 @@ const {
 	addTask,
 	updateTask,
 } = useGanttFilters(route, projectId, viewId)
+
+const compactView = ref(true)
 
 const DEFAULT_DATE_RANGE_DAYS = 7
 

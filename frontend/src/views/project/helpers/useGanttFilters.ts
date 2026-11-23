@@ -25,8 +25,8 @@ export interface GanttFilters {
 
 const DEFAULT_SHOW_TASKS_WITHOUT_DATES = false
 
-const DEFAULT_DATEFROM_DAY_OFFSET = -15
-const DEFAULT_DATETO_DAY_OFFSET = +55
+const DEFAULT_DATEFROM_DAY_OFFSET = -20
+const DEFAULT_DATETO_DAY_OFFSET = +90
 
 const now = new Date()
 
@@ -94,7 +94,7 @@ function ganttFiltersToApiParams(filters: GanttFilters): TaskFilterParams {
 			'(start_date <= "' + dateFrom + '" && end_date >= "' + dateTo + '")' +
 			')',
 		filter_include_nulls: filters.showTasksWithoutDates,
-		expand: ['subtasks'],
+		expand: ['subtasks', 'buckets'],
 	}
 }
 

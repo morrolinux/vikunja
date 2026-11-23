@@ -14,12 +14,13 @@
 			<GanttTimelineHeader
 				:timeline-data="timelineData"
 				:day-width-pixels="dayWidthPixels"
+				:tasks="tasks"
 			/>
 
 			<GanttVerticalGridLines
 				:timeline-data="timelineData"
 				:total-width="totalWidth"
-				:height="ganttRows.length * 40"
+				:height="ganttRows.length * ROW_HEIGHT"
 				:day-width-pixels="dayWidthPixels"
 			/>
 
@@ -60,7 +61,9 @@
 										:day-width-pixels="dayWidthPixels"
 										:is-dragging="isDragging"
 										:is-resizing="isResizing"
+										:is-dragging-due-date="isDraggingDueDate"
 										:drag-state="dragState"
+										:due-drag-state="dueDragState"
 										:focused-row="focusedRow ?? null"
 										:focused-cell="focusedCell"
 										:row-id="rowId"
@@ -68,6 +71,8 @@
 										:is-collapsed="collapsedTaskIds.has(Number(ganttBars[index]?.[0]?.id))"
 										@barPointerDown="handleBarPointerDown"
 										@startResize="startResize"
+										@startDueDateDrag="startDueDateDrag"
+										@createDueDate="handleCreateDueDate"
 										@updateTask="updateGanttTask"
 										@toggleCollapse="toggleCollapse(Number(ganttBars[index]?.[0]?.id))"
 									/>
@@ -123,6 +128,7 @@ const props = defineProps<{
 	tasks: Map<number, TaskResponse>,
 	defaultTaskStartDate: DateISO
 	defaultTaskEndDate: DateISO
+	compactView?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -133,7 +139,14 @@ const DAY_WIDTH_PIXELS_MIN = 30
 const dayWidthPixels = ref(0)
 let resizeObserver: ResizeObserver | undefined
 
-const {tasks, filters} = toRefs(props)
+function findBucketNameForTask(task: ITask): string {
+	if (task.buckets && task.buckets.length > 0) {
+		return task.buckets[0].title ?? ''
+	}
+	return ''
+}
+
+const {tasks, filters, compactView} = toRefs(props)
 
 const dayjsLanguageLoading = useDayjsLanguageSync(dayjs)
 const ganttContainer = ref<HTMLElement | null>(null)
@@ -142,6 +155,7 @@ const router = useRouter()
 
 const isDragging = ref(false)
 const isResizing = ref(false)
+const isDraggingDueDate = ref(false)
 
 const currentFocusedRow = ref<string | null>(null)
 const currentFocusedCell = ref<number | null>(null)
@@ -153,6 +167,13 @@ const dragState = ref<{
 	originalEnd: Date
 	currentDays: number
 	edge?: 'start' | 'end'
+} | null>(null)
+
+const dueDragState = ref<{
+	barId: string
+	startX: number
+	originalDueDate: Date
+	currentDays: number
 } | null>(null)
 
 let dragMoveHandler: ((e: PointerEvent) => void) | null = null
@@ -303,6 +324,8 @@ function transformTaskToGanttBar(node: GanttTaskTreeNode): GanttBarModel {
 			isParent: node.isParent,
 			hasDerivedDates: node.hasDerivedDates,
 			indentLevel: node.indentLevel,
+			bucketName: findBucketNameForTask(t),
+			dueDate: parseDateOrNull(t.due_date) ?? undefined,
 		},
 	}
 }
@@ -361,6 +384,28 @@ watch(
 	{flush: 'post'},
 )
 
+function doBarsOverlap(a: GanttBarModel, b: GanttBarModel): boolean {
+	return a.start < b.end && b.start < a.end
+}
+
+function packBarsIntoRows(bars: GanttBarModel[]): GanttBarModel[][] {
+	const rows: GanttBarModel[][] = []
+	for (const bar of bars) {
+		let placed = false
+		for (const row of rows) {
+			if (!row.some(existing => doBarsOverlap(existing, bar))) {
+				row.push(bar)
+				placed = true
+				break
+			}
+		}
+		if (!placed) {
+			rows.push([bar])
+		}
+	}
+	return rows
+}
+
 // Build the task tree when tasks change
 watch(
 	[tasks, filters],
@@ -372,13 +417,11 @@ watch(
 
 // Derive bars, rows, and cells from visible nodes
 watch(
-	[visibleNodes, filters],
+	[visibleNodes, filters, compactView],
 	() => {
 		const bars: GanttBarModel[] = []
-		const rows: string[] = []
-		const cells: Record<string, string[]> = {}
 
-		visibleNodes.value.forEach((node, index) => {
+		visibleNodes.value.forEach((node) => {
 			const bar = transformTaskToGanttBar(node)
 
 			// Check if task is visible in the current date range
@@ -396,26 +439,24 @@ watch(
 			}
 
 			bars.push(bar)
-
-			const rowId = `row-${index}`
-			rows.push(rowId)
-
-			const rowCells: string[] = []
-			timelineData.value.forEach((_, dayIndex) => {
-				rowCells.push(`${rowId}-cell-${dayIndex}`)
-			})
-			cells[rowId] = rowCells
 		})
 
-		ganttBars.value = bars.map(bar => [bar])
-		ganttRows.value = rows
-		cellsByRow.value = cells
+		if (compactView.value) {
+			ganttBars.value = packBarsIntoRows(bars)
+		} else {
+			ganttBars.value = bars.map(bar => [bar])
+		}
+		ganttRows.value = ganttBars.value.map((_, i) => `row-${i}`)
+		cellsByRow.value = ganttRows.value.reduce((acc, rowId) => {
+			acc[rowId] = timelineData.value.map((_, dayIndex) => `${rowId}-cell-${dayIndex}`)
+			return acc
+		}, {} as Record<string, string[]>)
 	},
 	{deep: true, immediate: true},
 )
 
 // Compute bar positions for arrow rendering
-const ROW_HEIGHT = 40
+const ROW_HEIGHT = 72
 
 const barPositions = computed(() => {
 	const positions = new Map<number, GanttBarPosition>()
@@ -427,7 +468,7 @@ const barPositions = computed(() => {
 			const taskId = Number(bar.id)
 			let x = computeBarX(bar.start)
 			let width = computeBarWidth(bar)
-			const y = rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2
+			const y = rowIndex * ROW_HEIGHT + 30
 
 			// Apply drag/resize offset for the active bar
 			if (ds && bar.id === ds.barId && dragPixelOffset !== 0) {
@@ -520,7 +561,7 @@ const parentGroupBands = computed(() => {
 	return bands
 })
 
-function updateGanttTask(id: string, newStart: Date, newEnd: Date) {
+function updateGanttTask(id: string, newStart: Date, newEnd: Date, shiftDueDateDays?: number) {
 	const task = tasks.value.get(Number(id))
 	if (!task) return
 
@@ -555,6 +596,13 @@ function updateGanttTask(id: string, newStart: Date, newEnd: Date) {
 		// No dates at all — update both (existing behavior for dateless tasks)
 		update.start_date = roundToNaturalDayBoundary(newStart, true).toISOString()
 		update.end_date = roundToNaturalDayBoundary(newEnd).toISOString()
+	}
+
+	// Full-bar drag: shift dueDate alongside the bar
+	if (shiftDueDateDays !== undefined && shiftDueDateDays !== 0 && hasDueDate && task.due_date) {
+		const newDue = new Date(task.due_date)
+		newDue.setDate(newDue.getDate() + shiftDueDateDays)
+		update.due_date = roundToNaturalDayBoundary(newDue).toISOString()
 	}
 
 	emit('update:task', update)
@@ -675,12 +723,13 @@ function startDrag(bar: GanttBarModel, event: PointerEvent) {
 		clearCursor(barElement)
 		
 		if (dragState.value && dragState.value.currentDays !== 0) {
+			const days = dragState.value.currentDays
 			const newStart = new Date(dragState.value.originalStart)
-			newStart.setDate(newStart.getDate() + dragState.value.currentDays)
+			newStart.setDate(newStart.getDate() + days)
 			const newEnd = new Date(dragState.value.originalEnd)
-			newEnd.setDate(newEnd.getDate() + dragState.value.currentDays)
-			
-			updateGanttTask(bar.id, newStart, newEnd)
+			newEnd.setDate(newEnd.getDate() + days)
+
+			updateGanttTask(bar.id, newStart, newEnd, days)
 		}
 		
 		isDragging.value = false
@@ -778,6 +827,75 @@ function startResize(bar: GanttBarModel, edge: 'start' | 'end', event: PointerEv
 	document.addEventListener('pointerup', handleStop)
 }
 
+function handleCreateDueDate(bar: GanttBarModel, dayIndex: number) {
+	const newDueDate = new Date(dateFromDate.value)
+	newDueDate.setDate(newDueDate.getDate() + dayIndex)
+	emit('update:task', {
+		id: Number(bar.id),
+		due_date: roundToNaturalDayBoundary(newDueDate).toISOString(),
+	})
+}
+
+function startDueDateDrag(bar: GanttBarModel, event: PointerEvent) {
+	event.preventDefault()
+	event.stopPropagation()
+
+	const originalDueDate = bar.meta?.dueDate
+	if (!originalDueDate) return
+
+	isDraggingDueDate.value = true
+	dueDragState.value = {
+		barId: bar.id,
+		startX: event.clientX,
+		originalDueDate: new Date(originalDueDate),
+		currentDays: 0,
+	}
+
+	setCursor('grabbing')
+
+	const handleMove = (e: PointerEvent) => {
+		if (!dueDragState.value || !isDraggingDueDate.value) return
+
+		const diff = e.clientX - dueDragState.value.startX
+		const days = Math.round(diff / dayWidthPixels.value)
+
+		if (days !== dueDragState.value.currentDays) {
+			dueDragState.value.currentDays = days
+		}
+	}
+
+	const handleStop = () => {
+		if (dragMoveHandler) {
+			document.removeEventListener('pointermove', dragMoveHandler)
+			dragMoveHandler = null
+		}
+		if (dragStopHandler) {
+			document.removeEventListener('pointerup', dragStopHandler)
+			dragStopHandler = null
+		}
+
+		clearCursor()
+
+		if (dueDragState.value && dueDragState.value.currentDays !== 0) {
+			const newDueDate = new Date(dueDragState.value.originalDueDate)
+			newDueDate.setDate(newDueDate.getDate() + dueDragState.value.currentDays)
+			emit('update:task', {
+				id: Number(bar.id),
+				due_date: roundToNaturalDayBoundary(newDueDate).toISOString(),
+			})
+		}
+
+		isDraggingDueDate.value = false
+		dueDragState.value = null
+	}
+
+	dragMoveHandler = handleMove
+	dragStopHandler = handleStop
+
+	document.addEventListener('pointermove', handleMove)
+	document.addEventListener('pointerup', handleStop)
+}
+
 function handleFocusChange(payload: { row: string | null; cell: number | null }) {
 	currentFocusedRow.value = payload.row
 	currentFocusedCell.value = payload.cell
@@ -845,7 +963,7 @@ onUnmounted(() => {
 
 .gantt-row-content {
 	position: relative;
-	min-block-size: 40px;
+	min-block-size: 72px;
 	inline-size: 100%;
 }
 </style>
