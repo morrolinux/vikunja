@@ -516,6 +516,11 @@
                     "comment": "The type of file storage backend. Supported values are `local` and `s3`."
                 },
                 {
+                    "key": "validatestorage",
+                    "default_value": "true",
+                    "comment": "Whether to check at startup that the file storage is writable, by creating and removing a temporary file. Vikunja refuses to start if the check fails. Disable it to run with read-only storage credentials, for example a staging instance reading the files of a production bucket: uploads and deletions will then fail."
+                },
+                {
                     "key": "s3",
                     "comment": "Configuration for S3 storage backend",
                     "children": [

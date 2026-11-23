@@ -169,6 +169,9 @@ const (
 	FilesBasePath Key = `files.basepath`
 	FilesMaxSize  Key = `files.maxsize`
 	FilesType     Key = `files.type`
+	// FilesValidateStorage controls the write/remove check of the file storage at startup.
+	// Disable it to run with read-only storage credentials (e.g. a staging copy of prod).
+	FilesValidateStorage Key = `files.validatestorage`
 
 	// S3 Configuration
 	FilesS3Endpoint       Key = `files.s3.endpoint`
@@ -491,6 +494,7 @@ func initDefaultConfig() {
 	FilesBasePath.setDefault("files")
 	FilesMaxSize.setDefault("20MB")
 	FilesType.setDefault("local")
+	FilesValidateStorage.setDefault(true)
 	// S3 Configuration
 	FilesS3Endpoint.setDefault("")
 	FilesS3Bucket.setDefault("")

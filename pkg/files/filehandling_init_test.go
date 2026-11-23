@@ -94,3 +94,27 @@ func TestValidateFileStorage_BasePathIsAFile(t *testing.T) {
 
 	require.ErrorContains(t, ValidateFileStorage(context.Background()), "file storage path exists but is not a directory")
 }
+
+// setupReadOnlyLocalStorageTest creates the base path without write permission,
+// standing in for read-only storage credentials.
+func setupReadOnlyLocalStorageTest(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	basePath := setupLocalStorageTest(t)
+	require.NoError(t, os.Mkdir(basePath, 0500))
+	t.Cleanup(func() { _ = os.Chmod(basePath, 0700) })
+}
+
+func TestInitFileHandler_ReadOnlyStorageFailsValidation(t *testing.T) {
+	setupReadOnlyLocalStorageTest(t)
+
+	require.ErrorContains(t, InitFileHandler(context.Background()), "storage validation failed")
+}
+
+func TestInitFileHandler_ValidationDisabledAllowsReadOnlyStorage(t *testing.T) {
+	setupReadOnlyLocalStorageTest(t)
+	config.FilesValidateStorage.Set(false)
+
+	require.NoError(t, InitFileHandler(context.Background()))
+}

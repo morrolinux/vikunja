@@ -139,6 +139,11 @@ func InitFileHandler(ctx context.Context) error {
 		return err
 	}
 
+	if !config.FilesValidateStorage.GetBool() {
+		log.Warning("File storage validation is disabled (files.validatestorage = false): uploads and deletions fail if the storage is read-only.")
+		return nil
+	}
+
 	if err := ValidateFileStorage(ctx); err != nil {
 		return fmt.Errorf("storage validation failed: %w", err)
 	}
