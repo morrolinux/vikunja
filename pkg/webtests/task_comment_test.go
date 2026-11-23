@@ -236,9 +236,10 @@ func TestTaskComments(t *testing.T) {
 				assert.Contains(t, getHTTPErrorMessage(err), `Forbidden`)
 			})
 			t.Run("Shared Via Team readonly", func(t *testing.T) {
-				_, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "15"}, `{"comment":"Lorem Ipsum"}`)
-				require.Error(t, err)
-				assert.Contains(t, getHTTPErrorMessage(err), `Forbidden`)
+				// Fork: read-only users may comment
+				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "15"}, `{"comment":"Lorem Ipsum"}`)
+				require.NoError(t, err)
+				assert.Contains(t, rec.Body.String(), `"comment":"Lorem Ipsum"`)
 			})
 			t.Run("Shared Via Team write", func(t *testing.T) {
 				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "16"}, `{"comment":"Lorem Ipsum"}`)
@@ -252,9 +253,10 @@ func TestTaskComments(t *testing.T) {
 			})
 
 			t.Run("Shared Via User readonly", func(t *testing.T) {
-				_, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "18"}, `{"comment":"Lorem Ipsum"}`)
-				require.Error(t, err)
-				assert.Contains(t, getHTTPErrorMessage(err), `Forbidden`)
+				// Fork: read-only users may comment
+				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "18"}, `{"comment":"Lorem Ipsum"}`)
+				require.NoError(t, err)
+				assert.Contains(t, rec.Body.String(), `"comment":"Lorem Ipsum"`)
 			})
 			t.Run("Shared Via User write", func(t *testing.T) {
 				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "19"}, `{"comment":"Lorem Ipsum"}`)
@@ -268,9 +270,10 @@ func TestTaskComments(t *testing.T) {
 			})
 
 			t.Run("Shared Via Parent Project Team readonly", func(t *testing.T) {
-				_, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "21"}, `{"comment":"Lorem Ipsum"}`)
-				require.Error(t, err)
-				assert.Contains(t, getHTTPErrorMessage(err), `Forbidden`)
+				// Fork: read-only users may comment
+				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "21"}, `{"comment":"Lorem Ipsum"}`)
+				require.NoError(t, err)
+				assert.Contains(t, rec.Body.String(), `"comment":"Lorem Ipsum"`)
 			})
 			t.Run("Shared Via Parent Project Team write", func(t *testing.T) {
 				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "22"}, `{"comment":"Lorem Ipsum"}`)
@@ -284,9 +287,10 @@ func TestTaskComments(t *testing.T) {
 			})
 
 			t.Run("Shared Via Parent Project User readonly", func(t *testing.T) {
-				_, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "24"}, `{"comment":"Lorem Ipsum"}`)
-				require.Error(t, err)
-				assert.Contains(t, getHTTPErrorMessage(err), `Forbidden`)
+				// Fork: read-only users may comment
+				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "24"}, `{"comment":"Lorem Ipsum"}`)
+				require.NoError(t, err)
+				assert.Contains(t, rec.Body.String(), `"comment":"Lorem Ipsum"`)
 			})
 			t.Run("Shared Via Parent Project User write", func(t *testing.T) {
 				rec, err := testHandler.testCreateWithUser(nil, map[string]string{"task": "25"}, `{"comment":"Lorem Ipsum"}`)

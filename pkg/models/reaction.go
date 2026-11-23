@@ -216,6 +216,7 @@ func (r *Reaction) lockTaskForWrite(s *xorm.Session, a web.Auth) error {
 	if err != nil {
 		return err
 	}
-	_, err = lockTaskForWrite(s, a, t.ID)
+	// Fork: reacting only requires read access.
+	_, err = lockTaskForRead(s, a, t.ID)
 	return err
 }

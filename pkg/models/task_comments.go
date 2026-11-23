@@ -75,7 +75,7 @@ func (tc *TaskComment) Create(s *xorm.Session, a web.Auth) (err error) {
 }
 
 func (tc *TaskComment) CreateWithTimestamps(s *xorm.Session, a web.Auth) (err error) {
-	task, err := lockTaskForWrite(s, a, tc.TaskID)
+	task, err := lockTaskForRead(s, a, tc.TaskID)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (tc *TaskComment) Delete(s *xorm.Session, a web.Auth) error {
 	if err != nil {
 		return err
 	}
-	if _, err = lockTaskForWrite(s, a, tc.TaskID); err != nil {
+	if _, err = lockTaskForRead(s, a, tc.TaskID); err != nil {
 		return err
 	}
 
@@ -180,7 +180,7 @@ func (tc *TaskComment) Update(s *xorm.Session, a web.Auth) error {
 	}
 	tc.TaskID = saved.TaskID
 
-	task, err := lockTaskForWrite(s, a, tc.TaskID)
+	task, err := lockTaskForRead(s, a, tc.TaskID)
 	if err != nil {
 		return err
 	}

@@ -174,31 +174,20 @@ func TestHumaTaskComment(t *testing.T) {
 				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
 			})
 
-			// Read-only shares: create forbidden.
-			forbiddenCreate := map[string]string{
+			// Fork: read-only users may comment, so every share level can create.
+			allowedCreate := map[string]string{
 				"Shared Via Team readonly":                "15",
 				"Shared Via User readonly":                "18",
 				"Shared Via Parent Project Team readonly": "21",
 				"Shared Via Parent Project User readonly": "24",
-			}
-			for name, taskID := range forbiddenCreate {
-				t.Run(name, func(t *testing.T) {
-					_, err := onTaskAs(taskID, &testuser1).testCreateWithUser(nil, nil, `{"comment":"Lorem Ipsum"}`)
-					require.Error(t, err)
-					assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
-				})
-			}
-
-			// Write/admin shares: create allowed (8 positive cases).
-			allowedCreate := map[string]string{
-				"Shared Via Team write":                "16",
-				"Shared Via Team admin":                "17",
-				"Shared Via User write":                "19",
-				"Shared Via User admin":                "20",
-				"Shared Via Parent Project Team write": "22",
-				"Shared Via Parent Project Team admin": "23",
-				"Shared Via Parent Project User write": "25",
-				"Shared Via Parent Project User admin": "26",
+				"Shared Via Team write":                   "16",
+				"Shared Via Team admin":                   "17",
+				"Shared Via User write":                   "19",
+				"Shared Via User admin":                   "20",
+				"Shared Via Parent Project Team write":    "22",
+				"Shared Via Parent Project Team admin":    "23",
+				"Shared Via Parent Project User write":    "25",
+				"Shared Via Parent Project User admin":    "26",
 			}
 			for name, taskID := range allowedCreate {
 				t.Run(name, func(t *testing.T) {

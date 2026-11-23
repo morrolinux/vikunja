@@ -431,6 +431,26 @@ func lockTaskForWrite(s *xorm.Session, a web.Auth, taskID int64) (task Task, err
 	return task, nil
 }
 
+// lockTaskForRead is like lockTaskForWrite but only requires read access to the
+// task's project. Fork: used for comments and reactions, which read-only users
+// may create.
+func lockTaskForRead(s *xorm.Session, a web.Auth, taskID int64) (task Task, err error) {
+	task, err = GetTaskSimple(lockingSession(s), &Task{ID: taskID})
+	if err != nil {
+		return Task{}, err
+	}
+	db.Forget(s, taskMemoKey(taskID))
+
+	can, _, err := (&Project{ID: task.ProjectID}).CanRead(s, a)
+	if err != nil {
+		return Task{}, err
+	}
+	if !can {
+		return Task{}, ErrGenericForbidden{}
+	}
+	return task, nil
+}
+
 func lockViewsAndTasksForWrite(s *xorm.Session, a web.Auth, taskIDs []int64, projectIDs ...int64) (tasks map[int64]Task, views []*ProjectView, err error) {
 	existing, err := GetTasksSimpleByIDs(s, taskIDs)
 	if err != nil {
