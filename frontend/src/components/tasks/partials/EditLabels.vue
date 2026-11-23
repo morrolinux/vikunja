@@ -36,7 +36,7 @@
 				:style="getLabelStyles(option)"
 				class="tag search-result"
 			>
-				<span>{{ option.title }}</span>
+				<span>{{ option.title }} {{ option.description ? `(${option.description})` : '' }}</span>
 			</span>
 		</template>
 		<template #createOption="{query: newLabelTitle}">
@@ -137,13 +137,16 @@ async function removeLabel(label: Label) {
 	success({message: t('task.label.removeSuccess')})
 }
 
-async function createAndAddLabel(title: string) {
+async function createAndAddLabel(input: string) {
 	if (props.taskId === 0) {
 		return
 	}
 
+	// "title:description" creates a label with a description
+	const [title, description] = input.split(':')
 	const newLabel = await createLabelMutation.mutateAsync({
 		title,
+		description,
 		hex_color: getRandomColorHex(),
 	})
 	await addLabel(newLabel, false)
